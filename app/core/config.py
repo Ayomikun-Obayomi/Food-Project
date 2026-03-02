@@ -26,11 +26,12 @@ class Settings(BaseSettings):
     tiktok_client_secret: str = ""
 
     # CORS
-    allowed_origins: str = "http://localhost:3000,http://localhost:5173"
+    allowed_origins: str = "http://localhost:3000,http://localhost:5173,https://recipesearch-ai.netlify.app"
 
     @property
     def origins_list(self) -> list[str]:
-        return [o.strip() for o in self.allowed_origins.split(",")]
+        origins = [o.strip().rstrip("/") for o in self.allowed_origins.split(",") if o.strip()]
+        return origins
 
     class Config:
         env_file = ".env"

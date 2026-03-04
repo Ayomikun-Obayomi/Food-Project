@@ -5,6 +5,7 @@ falls back to keyword search + canned suggestions in dev-lite mode.
 import asyncio
 import json
 import math
+import re
 import random
 from typing import List, Optional, AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -117,6 +118,84 @@ def _recipe_row_to_dict(r) -> dict:
     }
 
 
+_NOISE_WORDS = {
+    "show", "me", "all", "the", "my", "find", "get", "give",
+    "some", "any", "a", "an", "of", "with", "for", "and",
+    "dishes", "dish", "food", "foods", "recipe", "recipes",
+    "meal", "meals", "stuff", "things", "options",
+}
+
+
+async def _parse_query_filters(
+    db: AsyncSession,
+    user_id: str,
+    query: str,
+    explicit_filters: Optional[dict],
+) -> tuple:
+    """
+    Parse natural language queries into structured filters.
+
+    "show me all Italian dishes"      → cuisine=Italian, leftover=""
+    "quick breakfast under 30 min"    → meal_type=breakfast, max_cook_time=30, leftover="quick"
+    "vegetarian lunch"                → diet=vegetarian, meal_type=lunch, leftover=""
+    "spicy chicken"                   → no filters extracted, leftover="spicy chicken"
+    """
+    filters = dict(explicit_filters or {})
+
+    result = await db.execute(
+        select(
+            Recipe.cuisine, Recipe.meal_type, Recipe.diet_labels,
+        )
+        .where(Recipe.user_id == user_id)
+    )
+    rows = result.all()
+
+    known_cuisines = {r.cuisine.lower(): r.cuisine for r in rows if r.cuisine}
+    known_meals = {r.meal_type.lower(): r.meal_type for r in rows if r.meal_type}
+    known_diets = {}
+    for r in rows:
+        for d in (r.diet_labels or []):
+            known_diets[d.lower()] = d
+
+    words = query.lower().split()
+    remaining = []
+
+    time_match = re.search(r'under\s+(\d+)\s*(?:min|minutes?|m)\b', query, re.IGNORECASE)
+    if time_match and "max_cook_time" not in filters:
+        filters["max_cook_time"] = int(time_match.group(1))
+        query = query[:time_match.start()] + query[time_match.end():]
+        words = query.lower().split()
+
+    for word in words:
+        if word in _NOISE_WORDS:
+            continue
+
+        if word in known_cuisines and "cuisine" not in filters:
+            filters["cuisine"] = known_cuisines[word]
+        elif word in known_meals and "meal_type" not in filters:
+            filters["meal_type"] = known_meals[word]
+        elif word in known_diets and "diet_labels" not in filters:
+            filters["diet_labels"] = [known_diets[word]]
+        else:
+            bigram_matched = False
+            for i, w in enumerate(words):
+                if w == word and i + 1 < len(words):
+                    bigram = f"{word} {words[i+1]}"
+                    if bigram in known_cuisines and "cuisine" not in filters:
+                        filters["cuisine"] = known_cuisines[bigram]
+                        bigram_matched = True
+                        break
+                    if bigram in known_diets and "diet_labels" not in filters:
+                        filters["diet_labels"] = [known_diets[bigram]]
+                        bigram_matched = True
+                        break
+            if not bigram_matched:
+                remaining.append(word)
+
+    leftover = " ".join(remaining).strip()
+    return leftover, filters
+
+
 async def vector_search(
     db: AsyncSession,
     user_id: str,
@@ -125,16 +204,23 @@ async def vector_search(
     filters: Optional[dict] = None,
 ) -> List[dict]:
     """
-    Search the user's recipe library.
+    Search the user's recipe library with natural language understanding.
+
+    Parses queries like "show me all Italian dishes" into structured filters,
+    then runs the appropriate search strategy:
     - Postgres + OpenAI key → pgvector cosine similarity
     - SQLite  + OpenAI key → in-Python cosine similarity on embedding_json
     - No OpenAI key        → keyword ILIKE fallback
     """
+    leftover, merged_filters = await _parse_query_filters(db, user_id, query, filters)
+
+    search_query = leftover if leftover else query
+
     if _has_openai and _is_postgres:
-        return await _pgvector_search(db, user_id, query, limit, filters)
+        return await _pgvector_search(db, user_id, search_query, limit, merged_filters or None)
     if _has_openai:
-        return await _embedding_search_sqlite(db, user_id, query, limit, filters)
-    return await _keyword_search(db, user_id, query, limit, filters)
+        return await _embedding_search_sqlite(db, user_id, search_query, limit, merged_filters or None)
+    return await _keyword_search(db, user_id, search_query, limit, merged_filters or None)
 
 
 async def _pgvector_search(
@@ -151,6 +237,9 @@ async def _pgvector_search(
     params: dict = {"user_id": user_id, "limit": limit, "vector": vector_str}
 
     if filters:
+        if filters.get("cuisine"):
+            filter_clauses.append("cuisine = :cuisine")
+            params["cuisine"] = filters["cuisine"]
         if filters.get("meal_type"):
             filter_clauses.append("meal_type = :meal_type")
             params["meal_type"] = filters["meal_type"]
@@ -198,6 +287,8 @@ async def _embedding_search_sqlite(
         Recipe.embedding_json.isnot(None),
     )
     if filters:
+        if filters.get("cuisine"):
+            q = q.where(Recipe.cuisine == filters["cuisine"])
         if filters.get("meal_type"):
             q = q.where(Recipe.meal_type == filters["meal_type"])
         if filters.get("max_cook_time"):
@@ -225,6 +316,8 @@ async def _embedding_search_sqlite(
 def _apply_filters(q, filters: Optional[dict]):
     if not filters:
         return q
+    if filters.get("cuisine"):
+        q = q.where(Recipe.cuisine == filters["cuisine"])
     if filters.get("meal_type"):
         q = q.where(Recipe.meal_type == filters["meal_type"])
     if filters.get("max_cook_time"):
@@ -243,24 +336,33 @@ async def _keyword_search(
     from sqlalchemy import cast, String, or_
 
     q = select(Recipe).where(Recipe.user_id == user_id)
-    pattern = f"%{query.lower()}%"
 
-    q = q.where(or_(
-        Recipe.title.ilike(pattern),
-        Recipe.description.ilike(pattern),
-        Recipe.cuisine.ilike(pattern),
-        Recipe.meal_type.ilike(pattern),
-        cast(Recipe.tags, String).ilike(pattern),
-        cast(Recipe.ingredients, String).ilike(pattern),
-        cast(Recipe.diet_labels, String).ilike(pattern),
-    ))
+    clean_query = query.strip()
+    has_keywords = bool(clean_query) and clean_query.lower() not in _NOISE_WORDS
+
+    if has_keywords:
+        pattern = f"%{clean_query.lower()}%"
+        q = q.where(or_(
+            Recipe.title.ilike(pattern),
+            Recipe.description.ilike(pattern),
+            Recipe.cuisine.ilike(pattern),
+            Recipe.meal_type.ilike(pattern),
+            cast(Recipe.tags, String).ilike(pattern),
+            cast(Recipe.ingredients, String).ilike(pattern),
+            cast(Recipe.diet_labels, String).ilike(pattern),
+        ))
+
     q = _apply_filters(q, filters)
     q = q.limit(limit)
 
     result = await db.execute(q)
     recipes = result.scalars().all()
 
-    scored = _rank_keyword_results(recipes, query.lower())
+    if has_keywords:
+        scored = _rank_keyword_results(recipes, clean_query.lower())
+    else:
+        scored = [(r, 0.95) for r in recipes]
+
     return [
         {**_recipe_row_to_dict(r), "similarity_score": score}
         for r, score in scored[:limit]

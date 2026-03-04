@@ -81,6 +81,7 @@ class RecipeOut(BaseModel):
 class SearchRequest(BaseModel):
     query: str
     limit: int = 10
+    cuisine: Optional[str] = None
     meal_type: Optional[str] = None
     diet_labels: Optional[List[str]] = None
     max_cook_time: Optional[int] = None

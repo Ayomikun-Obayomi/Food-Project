@@ -30,6 +30,8 @@ async def search_recipes(
     Optionally filters by meal type, diet labels, or max cook time.
     """
     filters = {}
+    if body.cuisine:
+        filters["cuisine"] = body.cuisine
     if body.meal_type:
         filters["meal_type"] = body.meal_type
     if body.diet_labels:

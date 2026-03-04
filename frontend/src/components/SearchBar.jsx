@@ -12,7 +12,7 @@ export default function SearchBar({ onSearch, onSelectRecipe }) {
   const inputRef = useRef(null)
 
   useEffect(() => {
-    if (query.length < 1) {
+    if (query.length < 2) {
       setRecipes([])
       setShowDropdown(false)
       return

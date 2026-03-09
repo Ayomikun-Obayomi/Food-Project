@@ -87,10 +87,18 @@ class SearchRequest(BaseModel):
     max_cook_time: Optional[int] = None
 
 
+class WebRecipeSuggestion(BaseModel):
+    title: str
+    description: str
+    cuisine: Optional[str] = None
+    cook_time_minutes: Optional[int] = None
+
 class SearchResult(BaseModel):
     recipes: List[RecipeOut]
-    suggestions: Optional[List[str]] = []  # AI-generated query suggestions
+    suggestions: Optional[List[str]] = []
+    web_results: Optional[List[WebRecipeSuggestion]] = []
     total: int
+    query: Optional[str] = None
 
 
 class RecipeSuggestion(BaseModel):

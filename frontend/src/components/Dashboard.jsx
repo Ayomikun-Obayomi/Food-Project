@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { getRecipes, getRecipe, searchRecipes, deleteRecipe, toggleFlags } from '../api'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { getRecipes, getRecipe, searchRecipes, deleteRecipe, toggleFlags, imageSearch } from '../api'
 import SearchBar from './SearchBar'
 import RecipeCard from './RecipeCard'
 import RecipeDetail from './RecipeDetail'
@@ -14,14 +14,28 @@ export default function Dashboard({ user, onLogout }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedRecipe, setSelectedRecipe] = useState(null)
   const [showAddRecipe, setShowAddRecipe] = useState(false)
+  const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const [activeFilter, setActiveFilter] = useState(null)
+  const [subFilter, setSubFilter] = useState(null)
+  const profileRef = useRef(null)
+  const fileUploadRef = useRef(null)
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (profileRef.current && !profileRef.current.contains(e.target)) {
+        setShowProfileMenu(false)
+      }
+    }
+    if (showProfileMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showProfileMenu])
 
   async function loadRecipes() {
     setLoading(true)
     try {
-      const params = {}
-      if (view === 'saved') params.saved_only = true
-      if (view === 'liked') params.liked_only = true
-      const data = await getRecipes(params)
+      const data = await getRecipes()
       setRecipes(data)
     } catch (err) {
       console.error('Failed to load recipes:', err)
@@ -93,7 +107,72 @@ export default function Dashboard({ user, onLogout }) {
     }
   }
 
-  const displayRecipes = searchResults ? searchResults.recipes : recipes
+  async function handleImageSearch(file) {
+    setLoading(true)
+    try {
+      const data = await imageSearch(file)
+      setSearchResults(data)
+      setSearchQuery(data.query || 'Image search')
+    } catch (err) {
+      console.error('Image search failed:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const savedCount = recipes.filter(r => r.is_saved).length
+  const likedCount = recipes.filter(r => r.is_liked).length
+
+  const mealCategories = ['Breakfast', 'Lunch', 'Snack', 'Dinner']
+
+  const baseRecipes = view === 'liked' ? recipes.filter(r => r.is_liked) : recipes
+
+  const mealRecipes = useMemo(() => {
+    if (!activeFilter) return baseRecipes
+    const key = activeFilter.toLowerCase()
+    return baseRecipes.filter(r => (r.meal_type || '').toLowerCase() === key)
+  }, [baseRecipes, activeFilter])
+
+  const subFilters = useMemo(() => {
+    if (!activeFilter) return []
+    const list = []
+    const seen = new Set()
+
+    const quickCount = mealRecipes.filter(r => r.cook_time_minutes && r.cook_time_minutes <= 15).length
+    const under30Count = mealRecipes.filter(r => r.cook_time_minutes && r.cook_time_minutes <= 30).length
+    if (quickCount > 0) list.push({ label: 'Quick & Easy', field: 'quick' })
+    if (under30Count > quickCount) list.push({ label: 'Under 30 min', field: 'under30' })
+
+    for (const r of mealRecipes) {
+      if (r.cuisine && !seen.has(r.cuisine)) {
+        seen.add(r.cuisine)
+        list.push({ label: r.cuisine, field: 'cuisine' })
+      }
+    }
+    for (const r of mealRecipes) {
+      for (const d of (r.diet_labels || [])) {
+        if (!seen.has(d)) {
+          seen.add(d)
+          list.push({ label: d, field: 'diet' })
+        }
+      }
+    }
+    return list
+  }, [activeFilter, mealRecipes])
+
+  let displayRecipes = searchResults ? searchResults.recipes : mealRecipes
+  if (!searchResults && subFilter) {
+    const sf = subFilters.find(f => f.label === subFilter)
+    if (sf) {
+      displayRecipes = displayRecipes.filter(r => {
+        if (sf.field === 'quick') return r.cook_time_minutes && r.cook_time_minutes <= 15
+        if (sf.field === 'under30') return r.cook_time_minutes && r.cook_time_minutes <= 30
+        if (sf.field === 'cuisine') return r.cuisine === sf.label
+        if (sf.field === 'diet') return (r.diet_labels || []).includes(sf.label)
+        return true
+      })
+    }
+  }
 
   return (
     <div className="dashboard">
@@ -102,16 +181,44 @@ export default function Dashboard({ user, onLogout }) {
           <span className="dash-logo">🍳</span>
           <h1>Recipe AI</h1>
         </div>
-        <div className="dash-header-right">
-          <span className="dash-user">
-            {user.display_name || user.email}
-          </span>
-          <button className="btn-ghost" onClick={onLogout}>Sign Out</button>
+        <div className="dash-header-center">
+          <SearchBar
+            onSearch={handleSearch}
+            onSelectRecipe={handleSelectSuggestedRecipe}
+            onAddRecipe={() => setShowAddRecipe(true)}
+            onUploadRecipe={() => fileUploadRef.current?.click()}
+          />
+        </div>
+        <div className="dash-profile" ref={profileRef}>
+          <button
+            className="dash-profile-btn"
+            onClick={() => setShowProfileMenu(prev => !prev)}
+          >
+            <span className="dash-avatar">
+              {(user.display_name || user.email || '?')[0].toUpperCase()}
+            </span>
+          </button>
+          {showProfileMenu && (
+            <div className="profile-menu">
+              <div className="profile-menu-header">
+                <span className="profile-menu-avatar">
+                  {(user.display_name || user.email || '?')[0].toUpperCase()}
+                </span>
+                <div className="profile-menu-info">
+                  <span className="profile-menu-name">{user.display_name || 'Chef'}</span>
+                  <span className="profile-menu-email">{user.email}</span>
+                </div>
+              </div>
+              <div className="profile-menu-divider" />
+              <button className="profile-menu-item" onClick={onLogout}>
+                Sign Out
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
       <main className="dash-main">
-        <SearchBar onSearch={handleSearch} onSelectRecipe={handleSelectSuggestedRecipe} />
 
         {searchQuery && searchResults && (
           <div className="search-info">
@@ -126,20 +233,59 @@ export default function Dashboard({ user, onLogout }) {
         )}
 
         {!searchQuery && (
-          <div className="view-tabs">
-            {['all', 'saved', 'liked'].map(v => (
-              <button
-                key={v}
-                className={`view-tab ${view === v ? 'active' : ''}`}
-                onClick={() => setView(v)}
-              >
-                {v === 'all' ? 'All Recipes' : v === 'saved' ? 'Saved' : 'Liked'}
-              </button>
-            ))}
-            <button className="btn-add" onClick={() => setShowAddRecipe(true)}>
-              + Add Recipe
-            </button>
-          </div>
+          <>
+            <div className="toolbar-row">
+              {view === 'all' && (
+                <div className="filter-chips">
+                  {activeFilter ? (
+                    <>
+                      <button
+                        className="filter-chip active"
+                        onClick={() => { setActiveFilter(null); setSubFilter(null) }}
+                      >
+                        <span className="filter-chip-x">&times;</span>
+                        {activeFilter}
+                      </button>
+                      {subFilters.map(sf => (
+                        <button
+                          key={sf.label}
+                          className={`filter-chip sub ${subFilter === sf.label ? 'active' : ''}`}
+                          onClick={() => setSubFilter(subFilter === sf.label ? null : sf.label)}
+                        >
+                          {sf.label}
+                        </button>
+                      ))}
+                    </>
+                  ) : (
+                    mealCategories.map(meal => (
+                      <button
+                        key={meal}
+                        className="filter-chip"
+                        onClick={() => setActiveFilter(meal)}
+                      >
+                        {meal}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+              <div className="view-tabs">
+                {[
+                  { key: 'all', label: 'All Recipes', count: recipes.length },
+                  { key: 'liked', label: 'Favorites', count: likedCount },
+                ].map(tab => (
+                  <button
+                    key={tab.key}
+                    className={`view-tab ${view === tab.key ? 'active' : ''}`}
+                    onClick={() => { setView(tab.key); setActiveFilter(null); setSubFilter(null) }}
+                  >
+                    {tab.label}
+                    <span className="tab-count">{tab.count}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
         )}
 
         {loading ? (
@@ -166,6 +312,24 @@ export default function Dashboard({ user, onLogout }) {
             ))}
           </div>
         )}
+
+        {searchResults?.web_results?.length > 0 && (
+          <div className="web-results">
+            <h3 className="web-results-title">Explore from the web</h3>
+            <div className="web-results-grid">
+              {searchResults.web_results.map((w, i) => (
+                <div key={i} className="web-result-card">
+                  <h4>{w.title}</h4>
+                  <p>{w.description}</p>
+                  <div className="web-result-meta">
+                    {w.cuisine && <span>{w.cuisine}</span>}
+                    {w.cook_time_minutes && <span>{w.cook_time_minutes} min</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </main>
 
       {selectedRecipe && (
@@ -177,6 +341,20 @@ export default function Dashboard({ user, onLogout }) {
         />
       )}
 
+      <input
+        ref={fileUploadRef}
+        type="file"
+        accept="image/*,.json,.txt"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file && file.type.startsWith('image/')) {
+            handleImageSearch(file)
+          }
+          e.target.value = ''
+        }}
+      />
+
       {showAddRecipe && (
         <AddRecipe
           onClose={() => setShowAddRecipe(false)}
@@ -186,6 +364,7 @@ export default function Dashboard({ user, onLogout }) {
           }}
         />
       )}
+
     </div>
   )
 }

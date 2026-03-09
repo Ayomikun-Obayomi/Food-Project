@@ -41,6 +41,43 @@ def _get_anthropic_client():
     return _anthropic_client
 
 
+# ── Image identification ──────────────────────────────────────────────────────
+
+async def identify_food_from_image(image_b64: str, media_type: str = "image/jpeg") -> str:
+    """Use Claude vision to identify food in an image and return a search query."""
+    if _has_anthropic:
+        client = _get_anthropic_client()
+        message = await client.messages.create(
+            model=settings.chat_model,
+            max_tokens=100,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": media_type,
+                            "data": image_b64,
+                        },
+                    },
+                    {
+                        "type": "text",
+                        "text": (
+                            "Identify the food or dish in this image. "
+                            "Reply with ONLY a short search query (2-6 words) "
+                            "describing the dish, cuisine, and key ingredients. "
+                            "No explanation, just the search terms."
+                        ),
+                    },
+                ],
+            }],
+        )
+        return message.content[0].text.strip()
+
+    return "food dish"
+
+
 # ── Embeddings ────────────────────────────────────────────────────────────────
 
 async def embed_text(text_input: str) -> List[float]:
@@ -123,6 +160,43 @@ _NOISE_WORDS = {
     "some", "any", "a", "an", "of", "with", "for", "and",
     "dishes", "dish", "food", "foods", "recipe", "recipes",
     "meal", "meals", "stuff", "things", "options",
+}
+
+_FLAVOR_DESCRIPTORS = {
+    "spicy":    ["chili", "pepper", "hot sauce", "sriracha", "cayenne", "jalapeño",
+                 "habanero", "gochujang", "wasabi", "chipotle", "red pepper flakes", "hot"],
+    "sweet":    ["sugar", "honey", "maple", "chocolate", "caramel", "vanilla",
+                 "cinnamon", "dessert", "cake", "pastry", "fruit", "berry", "molasses"],
+    "savory":   ["garlic", "onion", "soy sauce", "umami", "mushroom", "herb",
+                 "thyme", "rosemary", "broth", "roasted", "braised", "parmesan"],
+    "sour":     ["lemon", "lime", "vinegar", "citrus", "tamarind", "yogurt",
+                 "pickle", "fermented", "kimchi", "sauerkraut"],
+    "tangy":    ["lemon", "lime", "vinegar", "citrus", "mustard", "tamarind",
+                 "yogurt", "buttermilk", "pickle"],
+    "creamy":   ["cream", "cheese", "butter", "coconut milk", "yogurt", "alfredo",
+                 "béchamel", "ricotta", "mascarpone", "avocado"],
+    "crispy":   ["fried", "baked", "crunchy", "breaded", "tempura", "panko",
+                 "toasted", "crackling", "fritter"],
+    "smoky":    ["smoked", "barbecue", "bbq", "charred", "grilled", "chipotle",
+                 "paprika", "mesquite", "bacon"],
+    "fresh":    ["salad", "raw", "herb", "mint", "basil", "cilantro", "cucumber",
+                 "tomato", "arugula", "ceviche"],
+    "rich":     ["butter", "cream", "chocolate", "cheese", "braised", "stew",
+                 "risotto", "truffle", "gravy", "ragu"],
+    "light":    ["salad", "steamed", "poached", "broth", "grilled", "raw",
+                 "low-calorie", "fresh", "citrus"],
+    "hearty":   ["stew", "soup", "casserole", "pot pie", "braised", "bean",
+                 "lentil", "chili", "roast", "meat"],
+    "zesty":    ["lemon", "lime", "orange", "ginger", "chili", "cilantro",
+                 "garlic", "pepper"],
+    "bitter":   ["dark chocolate", "coffee", "kale", "arugula", "radicchio",
+                 "broccoli rabe", "grapefruit", "turmeric"],
+    "mild":     ["butter", "rice", "potato", "bread", "chicken", "tofu",
+                 "steamed", "plain", "simple"],
+    "comfort":  ["mac and cheese", "soup", "stew", "casserole", "pot pie",
+                 "pasta", "mashed", "grilled cheese", "fried chicken"],
+    "healthy":  ["salad", "steamed", "grilled", "lean", "vegetable", "quinoa",
+                 "whole grain", "low-fat", "fresh", "green"],
 }
 
 
@@ -325,6 +399,27 @@ def _apply_filters(q, filters: Optional[dict]):
     return q
 
 
+def _build_word_condition(word: str, Recipe, cast, String, or_):
+    """Build an OR condition for a single word, expanding flavor descriptors."""
+    terms = [word]
+    if word in _FLAVOR_DESCRIPTORS:
+        terms.extend(_FLAVOR_DESCRIPTORS[word])
+
+    patterns = [f"%{t}%" for t in terms]
+    conditions = []
+    for pat in patterns:
+        conditions.extend([
+            Recipe.title.ilike(pat),
+            Recipe.description.ilike(pat),
+            Recipe.cuisine.ilike(pat),
+            Recipe.meal_type.ilike(pat),
+            cast(Recipe.tags, String).ilike(pat),
+            cast(Recipe.ingredients, String).ilike(pat),
+            cast(Recipe.diet_labels, String).ilike(pat),
+        ])
+    return or_(*conditions)
+
+
 async def _keyword_search(
     db: AsyncSession,
     user_id: str,
@@ -332,25 +427,24 @@ async def _keyword_search(
     limit: int,
     filters: Optional[dict],
 ) -> List[dict]:
-    """Keyword search across all relevant recipe fields."""
-    from sqlalchemy import cast, String, or_
+    """
+    Keyword search — splits multi-word queries so each word matches independently,
+    and expands flavor descriptors (spicy, sweet, savory, etc.) into related terms.
+    """
+    from sqlalchemy import cast, String, or_, and_
 
     q = select(Recipe).where(Recipe.user_id == user_id)
 
     clean_query = query.strip()
-    has_keywords = bool(clean_query) and clean_query.lower() not in _NOISE_WORDS
+    words = [w for w in clean_query.lower().split() if w and w not in _NOISE_WORDS]
+    has_keywords = len(words) > 0
 
     if has_keywords:
-        pattern = f"%{clean_query.lower()}%"
-        q = q.where(or_(
-            Recipe.title.ilike(pattern),
-            Recipe.description.ilike(pattern),
-            Recipe.cuisine.ilike(pattern),
-            Recipe.meal_type.ilike(pattern),
-            cast(Recipe.tags, String).ilike(pattern),
-            cast(Recipe.ingredients, String).ilike(pattern),
-            cast(Recipe.diet_labels, String).ilike(pattern),
-        ))
+        word_conditions = [
+            _build_word_condition(w, Recipe, cast, String, or_)
+            for w in words
+        ]
+        q = q.where(and_(*word_conditions))
 
     q = _apply_filters(q, filters)
     q = q.limit(limit)
@@ -359,7 +453,7 @@ async def _keyword_search(
     recipes = result.scalars().all()
 
     if has_keywords:
-        scored = _rank_keyword_results(recipes, clean_query.lower())
+        scored = _rank_keyword_results(recipes, words)
     else:
         scored = [(r, 0.95) for r in recipes]
 
@@ -369,15 +463,26 @@ async def _keyword_search(
     ]
 
 
-def _rank_keyword_results(recipes, query_lower: str) -> List[tuple]:
-    """Rank keyword results: title-starts-with > title-contains > other fields."""
+def _rank_keyword_results(recipes, words: list) -> List[tuple]:
+    """Rank by how well words match the title vs other fields."""
     scored = []
     for r in recipes:
         title_lower = (r.title or "").lower()
-        if title_lower.startswith(query_lower):
+        desc_lower = (r.description or "").lower()
+        all_text = f"{title_lower} {desc_lower} {(r.cuisine or '').lower()} " \
+                   f"{json.dumps(r.tags or []).lower()} {json.dumps(r.ingredients or []).lower()}"
+
+        title_hits = sum(1 for w in words if w in title_lower or
+                         any(syn in title_lower for syn in _FLAVOR_DESCRIPTORS.get(w, [])))
+        total_hits = sum(1 for w in words if w in all_text or
+                         any(syn in all_text for syn in _FLAVOR_DESCRIPTORS.get(w, [])))
+
+        if title_hits == len(words):
             score = 0.99
-        elif query_lower in title_lower:
-            score = 0.90
+        elif title_hits > 0:
+            score = 0.90 + (0.05 * title_hits / len(words))
+        elif total_hits == len(words):
+            score = 0.85
         else:
             score = 0.75
         scored.append((r, round(score, 3)))
@@ -536,6 +641,34 @@ Only output the suggestions."""
     )
     text_out = message.content[0].text
     return [s.strip() for s in text_out.strip().split("\n") if s.strip()][:limit]
+
+
+# ── Web recipe suggestions ────────────────────────────────────────────────────
+
+async def suggest_web_recipes(query: str, limit: int = 5) -> List[dict]:
+    """Use Claude to suggest recipes from general knowledge when library has no matches."""
+    if not _has_anthropic:
+        return []
+
+    client = _get_anthropic_client()
+    prompt = f"""The user searched for: "{query}"
+Their personal recipe library had no close matches.
+
+Suggest exactly {limit} real recipes they might be looking for.
+Return JSON array only, no explanation. Each object: {{"title": "...", "description": "one sentence", "cuisine": "...", "cook_time_minutes": number}}"""
+
+    try:
+        message = await client.messages.create(
+            model=settings.chat_model,
+            max_tokens=500,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text_out = message.content[0].text.strip()
+        if text_out.startswith("```"):
+            text_out = text_out.split("\n", 1)[1].rsplit("```", 1)[0]
+        return json.loads(text_out)
+    except Exception:
+        return []
 
 
 # ── Streaming narrative ───────────────────────────────────────────────────────

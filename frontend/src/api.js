@@ -89,3 +89,29 @@ export async function getSuggestions(partial_query, recipe_limit = 4, suggestion
     body: JSON.stringify({ partial_query, recipe_limit, suggestion_limit }),
   });
 }
+
+export async function imageSearch(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const headers = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${API}/search/image`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  if (res.status === 401) {
+    setToken(null);
+    window.location.reload();
+  }
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || `Request failed: ${res.status}`);
+  }
+
+  return res.json();
+}

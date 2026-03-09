@@ -1,19 +1,22 @@
 import asyncio
+import base64
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List
 
 from app.core.database import get_db
 from app.models.models import User
-from app.models.schemas import SearchRequest, SearchResult, SuggestRequest, SuggestResponse, RecipeOut
+from app.models.schemas import SearchRequest, SearchResult, SuggestRequest, SuggestResponse, RecipeOut, WebRecipeSuggestion
 from app.services.auth_service import get_current_user
 from app.services.search_service import (
     vector_search,
     live_suggest,
     stream_search_narrative,
     save_search_history,
+    identify_food_from_image,
+    suggest_web_recipes,
 )
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -51,8 +54,17 @@ async def search_recipes(
         save_search_history(db, str(current_user.id), body.query, len(recipes))
     )
 
+    web_results = []
+    has_good_matches = any(
+        r.get("similarity_score", 0) > 0.8 for r in recipes
+    )
+    if len(recipes) < 3 or not has_good_matches:
+        web_suggestions = await suggest_web_recipes(body.query, limit=5)
+        web_results = [WebRecipeSuggestion(**w) for w in web_suggestions]
+
     return SearchResult(
         recipes=[RecipeOut(**r) for r in recipes],
+        web_results=web_results,
         total=len(recipes),
     )
 
@@ -95,6 +107,40 @@ async def suggest_live(
     return SuggestResponse(
         recipes=result["recipes"],
         suggestions=result["suggestions"],
+    )
+
+
+@router.post("/image", response_model=SearchResult)
+async def search_by_image(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Image search — upload a photo of food, AI identifies it,
+    then searches the user's recipe library for matches.
+    """
+    contents = await file.read()
+    b64 = base64.standard_b64encode(contents).decode("utf-8")
+    media_type = file.content_type or "image/jpeg"
+
+    description = await identify_food_from_image(b64, media_type)
+
+    recipes = await vector_search(
+        db=db,
+        user_id=str(current_user.id),
+        query=description,
+        limit=10,
+    )
+
+    asyncio.create_task(
+        save_search_history(db, str(current_user.id), f"[image] {description}", len(recipes))
+    )
+
+    return SearchResult(
+        recipes=[RecipeOut(**r) for r in recipes],
+        total=len(recipes),
+        query=description,
     )
 
 

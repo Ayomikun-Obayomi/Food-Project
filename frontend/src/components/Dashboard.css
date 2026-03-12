@@ -40,6 +40,7 @@
 .dash-profile {
   position: relative;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .dash-profile-btn {
@@ -301,6 +302,147 @@
   opacity: 0.7;
 }
 
+.filter-icon-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  cursor: pointer;
+  position: relative;
+  transition: background 0.15s, color 0.15s;
+}
+
+.filter-icon-btn:hover {
+  background: var(--border-focus);
+  color: var(--text);
+}
+
+.filter-icon-btn svg {
+  flex-shrink: 0;
+}
+
+.filter-icon-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  border-radius: 50%;
+}
+
+/* ── Filter drawer (mobile) ────────────────────────────────────────────── */
+
+.filter-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 150;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.filter-drawer {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  width: 100%;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  animation: slideUp 0.25s ease;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.filter-drawer-handle {
+  width: 40px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 12px auto;
+}
+
+.filter-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px 16px;
+}
+
+.filter-drawer-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.filter-drawer-close {
+  width: 36px;
+  height: 36px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background 0.15s, color 0.15s;
+}
+
+.filter-drawer-close:hover {
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
+.filter-drawer-body {
+  padding: 0 20px 20px;
+}
+
+.filter-drawer-section {
+  margin-bottom: 20px;
+}
+
+.filter-drawer-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.filter-drawer-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter-drawer-chips .filter-chip {
+  margin: 0;
+}
+
+.filter-drawer-clear {
+  margin-top: 8px;
+  width: 100%;
+}
+
 .recipe-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -412,6 +554,12 @@
 }
 
 @media (max-width: 768px) {
+  .filter-chips-desktop {
+    display: none !important;
+  }
+  .filter-icon-btn {
+    display: flex;
+  }
   .dash-header {
     flex-wrap: wrap;
     padding: 12px 16px;

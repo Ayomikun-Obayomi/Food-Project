@@ -6,6 +6,16 @@ import RecipeDetail from './RecipeDetail'
 import AddRecipe from './AddRecipe'
 import './Dashboard.css'
 
+function FilterIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="4" y1="6" x2="20" y2="6" />
+      <line x1="6" y1="12" x2="18" y2="12" />
+      <line x1="8" y1="18" x2="16" y2="18" />
+    </svg>
+  )
+}
+
 export default function Dashboard({ user, onLogout }) {
   const [recipes, setRecipes] = useState([])
   const [loading, setLoading] = useState(true)
@@ -15,9 +25,11 @@ export default function Dashboard({ user, onLogout }) {
   const [selectedRecipe, setSelectedRecipe] = useState(null)
   const [showAddRecipe, setShowAddRecipe] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const [showFilterDrawer, setShowFilterDrawer] = useState(false)
   const [activeFilter, setActiveFilter] = useState(null)
   const [subFilter, setSubFilter] = useState(null)
   const profileRef = useRef(null)
+  const filterRef = useRef(null)
   const fileUploadRef = useRef(null)
 
   useEffect(() => {
@@ -31,6 +43,18 @@ export default function Dashboard({ user, onLogout }) {
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [showProfileMenu])
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (filterRef.current && !filterRef.current.contains(e.target)) {
+        setShowFilterDrawer(false)
+      }
+    }
+    if (showFilterDrawer) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showFilterDrawer])
 
   async function loadRecipes() {
     setLoading(true)
@@ -236,38 +260,48 @@ export default function Dashboard({ user, onLogout }) {
           <>
             <div className="toolbar-row">
               {view === 'all' && (
-                <div className="filter-chips">
-                  {activeFilter ? (
-                    <>
-                      <button
-                        className="filter-chip active"
-                        onClick={() => { setActiveFilter(null); setSubFilter(null) }}
-                      >
-                        <span className="filter-chip-x">&times;</span>
-                        {activeFilter}
-                      </button>
-                      {subFilters.map(sf => (
+                <>
+                  <div className="filter-chips filter-chips-desktop">
+                    {activeFilter ? (
+                      <>
                         <button
-                          key={sf.label}
-                          className={`filter-chip sub ${subFilter === sf.label ? 'active' : ''}`}
-                          onClick={() => setSubFilter(subFilter === sf.label ? null : sf.label)}
+                          className="filter-chip active"
+                          onClick={() => { setActiveFilter(null); setSubFilter(null) }}
                         >
-                          {sf.label}
+                          <span className="filter-chip-x">&times;</span>
+                          {activeFilter}
                         </button>
-                      ))}
-                    </>
-                  ) : (
-                    mealCategories.map(meal => (
-                      <button
-                        key={meal}
-                        className="filter-chip"
-                        onClick={() => setActiveFilter(meal)}
-                      >
-                        {meal}
-                      </button>
-                    ))
-                  )}
-                </div>
+                        {subFilters.map(sf => (
+                          <button
+                            key={sf.label}
+                            className={`filter-chip sub ${subFilter === sf.label ? 'active' : ''}`}
+                            onClick={() => setSubFilter(subFilter === sf.label ? null : sf.label)}
+                          >
+                            {sf.label}
+                          </button>
+                        ))}
+                      </>
+                    ) : (
+                      mealCategories.map(meal => (
+                        <button
+                          key={meal}
+                          className="filter-chip"
+                          onClick={() => setActiveFilter(meal)}
+                        >
+                          {meal}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                  <button
+                    className="filter-icon-btn"
+                    onClick={() => setShowFilterDrawer(true)}
+                    aria-label="Open filters"
+                  >
+                    <FilterIcon />
+                    {activeFilter && <span className="filter-icon-badge" />}
+                  </button>
+                </>
               )}
               <div className="view-tabs">
                 {[
@@ -363,6 +397,60 @@ export default function Dashboard({ user, onLogout }) {
             setShowAddRecipe(false)
           }}
         />
+      )}
+
+      {showFilterDrawer && (
+        <div className="filter-drawer-overlay" onClick={() => setShowFilterDrawer(false)}>
+          <div className="filter-drawer" ref={filterRef} onClick={e => e.stopPropagation()}>
+            <div className="filter-drawer-handle" />
+            <div className="filter-drawer-header">
+              <h3>Filters</h3>
+              <button className="filter-drawer-close" onClick={() => setShowFilterDrawer(false)} aria-label="Close">
+                &times;
+              </button>
+            </div>
+            <div className="filter-drawer-body">
+              <div className="filter-drawer-section">
+                <label className="filter-drawer-label">Meal type</label>
+                <div className="filter-drawer-chips">
+                  {mealCategories.map(meal => (
+                    <button
+                      key={meal}
+                      className={`filter-chip ${activeFilter === meal ? 'active' : ''}`}
+                      onClick={() => setActiveFilter(activeFilter === meal ? null : meal)}
+                    >
+                      {meal}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {activeFilter && subFilters.length > 0 && (
+                <div className="filter-drawer-section">
+                  <label className="filter-drawer-label">Refine</label>
+                  <div className="filter-drawer-chips">
+                    {subFilters.map(sf => (
+                      <button
+                        key={sf.label}
+                        className={`filter-chip sub ${subFilter === sf.label ? 'active' : ''}`}
+                        onClick={() => setSubFilter(subFilter === sf.label ? null : sf.label)}
+                      >
+                        {sf.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {activeFilter && (
+                <button
+                  className="btn-ghost filter-drawer-clear"
+                  onClick={() => { setActiveFilter(null); setSubFilter(null); setShowFilterDrawer(false) }}
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

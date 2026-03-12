@@ -25,13 +25,26 @@ class Settings(BaseSettings):
     tiktok_client_id: str = ""
     tiktok_client_secret: str = ""
 
-    # CORS
-    allowed_origins: str = "http://localhost:3000,http://localhost:5173,https://recipesearch-ai.netlify.app"
+    # CORS - comma-separated; if empty, falls back to permissive defaults for common dev/prod origins
+    allowed_origins: str = ""
 
     @property
     def origins_list(self) -> list[str]:
-        origins = [o.strip().rstrip("/") for o in self.allowed_origins.split(",") if o.strip()]
-        return origins
+        raw = [o.strip().rstrip("/") for o in self.allowed_origins.split(",") if o.strip()]
+        if raw:
+            return raw
+        # Fallback when ALLOWED_ORIGINS not set (e.g. Render dashboard)
+        return [
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "http://localhost:5174",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:5174",
+            "https://recipesearch-ai.netlify.app",
+            "https://food-project.netlify.app",
+            "https://food-project-zsf2.netlify.app",
+        ]
 
     class Config:
         env_file = ".env"

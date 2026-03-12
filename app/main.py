@@ -175,8 +175,10 @@ app.add_middleware(
     allow_origins=settings.origins_list,
     allow_origin_regex=r"https://.*\.netlify\.app",  # any Netlify deployment
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"],
+    expose_headers=["*"],
+    max_age=600,
 )
 
 app.include_router(auth.router, prefix="/api/v1")

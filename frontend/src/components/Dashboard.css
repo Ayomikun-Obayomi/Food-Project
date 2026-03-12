@@ -32,9 +32,11 @@
 }
 
 .dash-header-center {
-  flex: 1;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
   max-width: 480px;
-  margin: 0 auto;
 }
 
 .dash-profile {
@@ -578,9 +580,13 @@
     gap: 12px;
   }
   .dash-header-center {
+    position: static;
+    left: auto;
+    transform: none;
     order: 3;
     flex-basis: 100%;
     max-width: 100%;
+    width: 100%;
   }
   .dash-main {
     padding: 20px 16px;

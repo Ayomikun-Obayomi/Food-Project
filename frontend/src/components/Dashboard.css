@@ -304,6 +304,78 @@
   opacity: 0.7;
 }
 
+.filter-chip-add {
+  padding: 7px 14px;
+  color: var(--accent);
+  font-size: 16px;
+}
+
+.filter-chip-add:hover {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.filter-chip-add-inline {
+  flex-shrink: 0;
+  display: inline-flex;
+}
+
+.filter-chip-add-inline input {
+  width: 120px;
+  padding: 7px 14px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+}
+
+.filter-chip-add-inline input:focus {
+  border-color: var(--accent);
+}
+
+.filter-chip-add-inline input::placeholder {
+  color: var(--text-muted);
+}
+
+.filter-chip-delete {
+  margin-left: 4px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+  opacity: 0.6;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.filter-chip-delete:hover {
+  opacity: 1;
+  color: var(--red);
+}
+
+.filter-chip-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.filter-chip-group + .filter-chip-group {
+  margin-left: 4px;
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+}
+
+.filter-chip-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 .filter-icon-btn {
   display: none;
   align-items: center;
@@ -361,7 +433,8 @@
   background: var(--bg-card);
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   width: 100%;
-  max-height: 70vh;
+  height: 85vh;
+  max-height: 90vh;
   overflow-y: auto;
   padding-bottom: calc(24px + env(safe-area-inset-bottom));
   animation: slideUp 0.25s ease;
@@ -529,7 +602,7 @@
 .web-result-card {
   padding: 16px;
   background: var(--bg-card, #fff);
-  border: 1px dashed var(--border);
+  border: 1px solid var(--border);
   border-radius: var(--radius, 12px);
   cursor: default;
 }

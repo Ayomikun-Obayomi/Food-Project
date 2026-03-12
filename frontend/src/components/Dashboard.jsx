@@ -626,10 +626,11 @@ export default function Dashboard({ user, onLogout }) {
             <div className="filter-drawer-header">
               <h3>Filters</h3>
               <button
-                className="btn-ghost filter-drawer-header-clear"
-                onClick={() => { setActiveFilter(null); setSubFilter(null); setShowFilterDrawer(false) }}
+                className="filter-drawer-close"
+                onClick={() => setShowFilterDrawer(false)}
+                aria-label="Close"
               >
-                Clear
+                &times;
               </button>
             </div>
             <div className="filter-drawer-body">
@@ -699,16 +700,20 @@ export default function Dashboard({ user, onLogout }) {
                   </div>
                 </div>
               ))}
-              {activeFilter && (
-                <div className="filter-drawer-actions">
-                  <button
-                    className="btn-ghost filter-drawer-apply"
-                    onClick={() => setShowFilterDrawer(false)}
-                  >
-                    Apply filters
-                  </button>
-                </div>
-              )}
+              <div className="filter-drawer-actions">
+                <button
+                  className="filter-drawer-clear"
+                  onClick={() => { setActiveFilter(null); setSubFilter(null) }}
+                >
+                  Clear
+                </button>
+                <button
+                  className="filter-drawer-apply"
+                  onClick={() => setShowFilterDrawer(false)}
+                >
+                  Apply
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -169,6 +169,7 @@ async def lifespan(app: FastAPI):
 def _is_allowed_origin(origin: str) -> bool:
     if not origin:
         return False
+    origin = origin.rstrip("/")
     # localhost with any port
     if re.match(r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$", origin):
         return True
@@ -210,7 +211,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.add_middleware(PreflightCORSMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.origins_list,
@@ -221,6 +221,7 @@ app.add_middleware(
     expose_headers=["*"],
     max_age=600,
 )
+app.add_middleware(PreflightCORSMiddleware)  # runs first (added last) to guarantee OPTIONS gets Allow-Origin
 
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(recipes.router, prefix="/api/v1")

@@ -1,6 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 from contextlib import asynccontextmanager
+import re
 
 from app.core.config import get_settings
 from app.core.database import init_db, AsyncSessionLocal
@@ -163,6 +166,43 @@ async def lifespan(app: FastAPI):
     print("Shutting down")
 
 
+def _is_allowed_origin(origin: str) -> bool:
+    if not origin:
+        return False
+    # localhost with any port
+    if re.match(r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$", origin):
+        return True
+    # any netlify deployment (including deploy-preview URLs)
+    if re.match(r"^https://.+\.netlify\.app$", origin):
+        return True
+    return origin.rstrip("/") in settings.origins_list
+
+
+class PreflightCORSMiddleware(BaseHTTPMiddleware):
+    """Handle OPTIONS preflight explicitly so CORS headers are always present."""
+
+    async def dispatch(self, request, call_next):
+        origin = request.headers.get("origin", "")
+        if request.method == "OPTIONS" and _is_allowed_origin(origin):
+            return Response(
+                status_code=200,
+                headers={
+                    "Access-Control-Allow-Origin": origin,
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept, Origin, X-Requested-With",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Max-Age": "600",
+                    "Content-Length": "0",
+                },
+            )
+        response = await call_next(request)
+        # Ensure CORS headers on actual responses too (in case CORSMiddleware misses)
+        if origin and _is_allowed_origin(origin):
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+        return response
+
+
 app = FastAPI(
     title="Recipe AI Backend",
     description="Semantic recipe search powered by vector embeddings + Claude AI",
@@ -170,6 +210,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(PreflightCORSMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.origins_list,

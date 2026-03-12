@@ -1,11 +1,19 @@
 const API = (import.meta.env.VITE_API_URL || 'http://localhost:8000') + '/api/v1';
 
-let token = localStorage.getItem('token');
+let token = (() => {
+  try {
+    return localStorage.getItem('token');
+  } catch {
+    return null;
+  }
+})();
 
 export function setToken(t) {
   token = t;
-  if (t) localStorage.setItem('token', t);
-  else localStorage.removeItem('token');
+  try {
+    if (t) localStorage.setItem('token', t);
+    else localStorage.removeItem('token');
+  } catch (_) {}
 }
 
 export function getToken() {

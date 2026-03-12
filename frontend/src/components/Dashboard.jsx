@@ -34,6 +34,7 @@ export default function Dashboard({ user, onLogout }) {
   const [showAddRecipe, setShowAddRecipe] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [showFilterDrawer, setShowFilterDrawer] = useState(false)
+  const [showRefineModal, setShowRefineModal] = useState(false)
   const [activeFilter, setActiveFilter] = useState(null)
   const [subFilter, setSubFilter] = useState(null)
   const [customFilters, setCustomFilters] = useState(() => {
@@ -45,7 +46,10 @@ export default function Dashboard({ user, onLogout }) {
   const [addFilterValue, setAddFilterValue] = useState('')
   const profileRef = useRef(null)
   const filterRef = useRef(null)
+  const refineModalRef = useRef(null)
   const addFilterInputRef = useRef(null)
+  const filterChipsRef = useRef(null)
+  const [scrollState, setScrollState] = useState({ canScrollLeft: false, canScrollRight: false })
   const fileUploadRef = useRef(null)
 
   useEffect(() => {
@@ -75,6 +79,16 @@ export default function Dashboard({ user, onLogout }) {
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [showFilterDrawer])
+
+  useEffect(() => {
+    function handleEsc(e) {
+      if (e.key === 'Escape') setShowRefineModal(false)
+    }
+    if (showRefineModal) {
+      document.addEventListener('keydown', handleEsc)
+      return () => document.removeEventListener('keydown', handleEsc)
+    }
+  }, [showRefineModal])
 
   useEffect(() => {
     if (showAddFilterInput) addFilterInputRef.current?.focus()
@@ -264,6 +278,30 @@ export default function Dashboard({ user, onLogout }) {
     return sections
   }, [activeFilter, mealRecipes])
 
+  useEffect(() => {
+    const el = filterChipsRef.current
+    if (!el) return
+    const check = () => {
+      requestAnimationFrame(() => {
+        if (!el) return
+        const { scrollLeft, scrollWidth, clientWidth } = el
+        const canScrollLeft = scrollLeft > 0
+        const canScrollRight = scrollLeft + clientWidth < scrollWidth - 1
+        setScrollState({ canScrollLeft, canScrollRight })
+      })
+    }
+    check()
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    el.addEventListener('scroll', check)
+    window.addEventListener('resize', check)
+    return () => {
+      ro.disconnect()
+      el.removeEventListener('scroll', check)
+      window.removeEventListener('resize', check)
+    }
+  }, [activeFilter, subFilter, mealCategories, subFilterSections, showAddFilterInput])
+
   let displayRecipes = searchResults ? searchResults.recipes : mealRecipes
   if (!searchResults && subFilter) {
     const sf = subFilters.find(f => f.label === subFilter)
@@ -341,79 +379,95 @@ export default function Dashboard({ user, onLogout }) {
             <div className="toolbar-row">
               {view === 'all' && (
                 <>
-                  <div className="filter-chips filter-chips-desktop">
-                    {activeFilter ? (
-                      <>
+                  <div className="filter-chips-wrap">
+                    <div className="filter-chips filter-chips-desktop" ref={filterChipsRef}>
+                    <>
+                      {mealCategories.map(meal => (
                         <button
-                          className="filter-chip active"
-                          onClick={() => { setActiveFilter(null); setSubFilter(null) }}
+                          key={meal}
+                          className={`filter-chip ${activeFilter === meal ? 'active' : ''}`}
+                          onClick={() => { setActiveFilter(activeFilter === meal ? null : meal); setShowRefineModal(activeFilter === meal ? false : true) }}
                         >
-                          <span className="filter-chip-x">&times;</span>
-                          {activeFilter}
+                          {activeFilter === meal && (
+                            <span
+                              className="filter-chip-x"
+                              onClick={e => { e.stopPropagation(); setActiveFilter(null); setSubFilter(null); setShowRefineModal(false) }}
+                              role="button"
+                              aria-label="Clear category"
+                            >
+                              &times;
+                            </span>
+                          )}
+                          {meal}
+                          {customFilters.includes(meal) && (
+                            <span
+                              className="filter-chip-delete"
+                              onClick={e => handleRemoveCustomFilter(meal, e)}
+                              role="button"
+                              aria-label={`Remove ${meal} category`}
+                            >
+                              &times;
+                            </span>
+                          )}
                         </button>
-                        {subFilterSections.map(sec => (
-                          <span key={sec.label} className="filter-chip-group">
-                            <span className="filter-chip-section-label">{sec.label}</span>
-                            {sec.filters.map(sf => (
-                              <button
-                                key={sf.label}
-                                className={`filter-chip sub ${subFilter === sf.label ? 'active' : ''}`}
-                                onClick={() => setSubFilter(subFilter === sf.label ? null : sf.label)}
-                              >
-                                {capitalizeLabel(sf.label)}
-                              </button>
-                            ))}
-                          </span>
-                        ))}
-                      </>
-                    ) : (
-                      <>
-                        {mealCategories.map(meal => (
-                          <button
-                            key={meal}
-                            className="filter-chip"
-                            onClick={() => setActiveFilter(meal)}
-                          >
-                            {meal}
-                            {customFilters.includes(meal) && (
-                              <span
-                                className="filter-chip-delete"
-                                onClick={e => handleRemoveCustomFilter(meal, e)}
-                                role="button"
-                                aria-label={`Remove ${meal} category`}
-                              >
-                                &times;
-                              </span>
-                            )}
-                          </button>
-                        ))}
-                        {showAddFilterInput ? (
-                          <span className="filter-chip-add-inline">
-                            <input
-                              ref={addFilterInputRef}
-                              type="text"
-                              value={addFilterValue}
-                              onChange={e => setAddFilterValue(e.target.value)}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter') handleAddCustomFilter()
-                                if (e.key === 'Escape') { setShowAddFilterInput(false); setAddFilterValue('') }
-                              }}
-                              onBlur={handleAddCustomFilter}
-                              placeholder="New category"
-                              maxLength={24}
-                              autoFocus
-                            />
-                          </span>
-                        ) : (
-                          <button
-                            className="filter-chip filter-chip-add"
-                            onClick={() => setShowAddFilterInput(true)}
-                            aria-label="Add custom category"
-                          >
-                            +
-                          </button>
-                        )}
-                      </>
+                      ))}
+                      {showAddFilterInput ? (
+                        <span className="filter-chip-add-inline">
+                          <input
+                            ref={addFilterInputRef}
+                            type="text"
+                            value={addFilterValue}
+                            onChange={e => setAddFilterValue(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') handleAddCustomFilter()
+                              if (e.key === 'Escape') { setShowAddFilterInput(false); setAddFilterValue('') }
+                            }}
+                            onBlur={handleAddCustomFilter}
+                            placeholder="New category"
+                            maxLength={24}
+                            autoFocus
+                          />
+                        </span>
+                      ) : (
+                        <button
+                          className="filter-chip filter-chip-add"
+                          onClick={() => setShowAddFilterInput(true)}
+                          aria-label="Add custom category"
+                        >
+                          +
+                        </button>
+                      )}
+                    </>
+                    </div>
+                    {scrollState.canScrollLeft && (
+                      <button
+                        type="button"
+                        className="filter-chips-chevron-overlay filter-chips-chevron-left"
+                        onClick={() => {
+                          const el = filterChipsRef.current
+                          if (el) el.scrollBy({ left: -el.clientWidth * 0.85, behavior: 'smooth' })
+                        }}
+                        aria-label="Scroll left"
+                      >
+                        <span className="filter-chips-chevron">
+                          <svg width="10" height="18" viewBox="0 0 10 18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M8 16L2 9l6-7" /></svg>
+                        </span>
+                      </button>
+                    )}
+                    {scrollState.canScrollRight && (
+                      <button
+                        type="button"
+                        className="filter-chips-chevron-overlay filter-chips-chevron-right"
+                        onClick={() => {
+                          const el = filterChipsRef.current
+                          if (el) el.scrollBy({ left: el.clientWidth * 0.85, behavior: 'smooth' })
+                        }}
+                        aria-label="Scroll right"
+                      >
+                        <span className="filter-chips-chevron">
+                          <svg width="10" height="18" viewBox="0 0 10 18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M2 2l6 7-6 7" /></svg>
+                        </span>
+                      </button>
                     )}
                   </div>
                   <button
@@ -522,14 +576,60 @@ export default function Dashboard({ user, onLogout }) {
         />
       )}
 
+      {showRefineModal && activeFilter && (
+        <div className="refine-modal-overlay" onClick={() => setShowRefineModal(false)}>
+          <div className="refine-modal" ref={refineModalRef} onClick={e => e.stopPropagation()}>
+            <div className="refine-modal-header">
+              <h3>Refine {activeFilter}</h3>
+              <button className="refine-modal-close" onClick={() => setShowRefineModal(false)} aria-label="Close">&times;</button>
+            </div>
+            <div className="refine-modal-body">
+              {subFilterSections.map(sec => (
+                <div key={sec.label} className="refine-modal-section">
+                  <label className="refine-modal-label">{sec.label}</label>
+                  <div className="refine-modal-chips">
+                    {sec.filters.map(sf => (
+                      <button
+                        key={sf.label}
+                        className={`filter-chip sub ${subFilter === sf.label ? 'active' : ''}`}
+                        onClick={() => setSubFilter(subFilter === sf.label ? null : sf.label)}
+                      >
+                        {capitalizeLabel(sf.label)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <div className="refine-modal-actions">
+                <button
+                  className="btn-ghost"
+                  onClick={() => { setActiveFilter(null); setSubFilter(null); setShowRefineModal(false) }}
+                >
+                  Clear
+                </button>
+                <button
+                  className="btn-ghost refine-modal-apply"
+                  onClick={() => setShowRefineModal(false)}
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showFilterDrawer && (
         <div className="filter-drawer-overlay" onClick={() => setShowFilterDrawer(false)}>
           <div className="filter-drawer" ref={filterRef} onClick={e => e.stopPropagation()}>
             <div className="filter-drawer-handle" />
             <div className="filter-drawer-header">
               <h3>Filters</h3>
-              <button className="filter-drawer-close" onClick={() => setShowFilterDrawer(false)} aria-label="Close">
-                &times;
+              <button
+                className="btn-ghost filter-drawer-header-clear"
+                onClick={() => { setActiveFilter(null); setSubFilter(null); setShowFilterDrawer(false) }}
+              >
+                Clear
               </button>
             </div>
             <div className="filter-drawer-body">
@@ -600,12 +700,14 @@ export default function Dashboard({ user, onLogout }) {
                 </div>
               ))}
               {activeFilter && (
-                <button
-                  className="btn-ghost filter-drawer-clear"
-                  onClick={() => { setActiveFilter(null); setSubFilter(null); setShowFilterDrawer(false) }}
-                >
-                  Clear filters
-                </button>
+                <div className="filter-drawer-actions">
+                  <button
+                    className="btn-ghost filter-drawer-apply"
+                    onClick={() => setShowFilterDrawer(false)}
+                  >
+                    Apply filters
+                  </button>
+                </div>
               )}
             </div>
           </div>

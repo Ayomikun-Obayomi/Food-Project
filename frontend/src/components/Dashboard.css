@@ -242,6 +242,12 @@
   opacity: 1;
 }
 
+.filter-chips-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
 .filter-chips {
   display: flex;
   gap: 8px;
@@ -249,6 +255,55 @@
   scrollbar-width: none;
   -ms-overflow-style: none;
   padding-bottom: 2px;
+}
+
+.filter-chips-chevron-overlay {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 52px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.filter-chips-chevron-left {
+  left: 0;
+  background: none;
+  justify-content: flex-start;
+  padding-left: 0;
+}
+
+.filter-chips-chevron-right {
+  right: 0;
+  background: none;
+  justify-content: flex-end;
+  padding-right: 0;
+}
+
+.filter-chips-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: none;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.filter-chips-chevron svg {
+  flex-shrink: 0;
 }
 
 .filter-chips::-webkit-scrollbar {
@@ -410,6 +465,116 @@
   border-radius: 50%;
 }
 
+/* ── Refine modal (desktop) ────────────────────────────────────────────── */
+
+.refine-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 160;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: fadeIn 0.2s ease;
+}
+
+.refine-modal {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 440px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow);
+  animation: refineModalIn 0.2s ease;
+}
+
+@keyframes refineModalIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.refine-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.refine-modal-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.refine-modal-close {
+  width: 36px;
+  height: 36px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  opacity: 0.7;
+}
+
+.refine-modal-close:hover {
+  background: var(--bg-elevated);
+  color: var(--text);
+  opacity: 1;
+}
+
+.refine-modal-body {
+  padding: 20px;
+}
+
+.refine-modal-section {
+  margin-bottom: 20px;
+}
+
+.refine-modal-section:last-of-type {
+  margin-bottom: 24px;
+}
+
+.refine-modal-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.refine-modal-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.refine-modal-chips .filter-chip {
+  margin: 0;
+}
+
+.refine-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.refine-modal-apply {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: white !important;
+}
+
 /* ── Filter drawer (mobile) ────────────────────────────────────────────── */
 
 .filter-drawer-overlay {
@@ -471,18 +636,40 @@
   background: none;
   border: none;
   color: var(--text-muted);
+  opacity: 0.6;
   font-size: 24px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, opacity 0.15s;
 }
 
 .filter-drawer-close:hover {
+  opacity: 1;
   background: var(--bg-elevated);
   color: var(--text);
+}
+
+.filter-drawer-actions .filter-drawer-close {
+  width: 100%;
+  height: auto;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  font-size: 18px;
+  opacity: 0.7;
+}
+
+.filter-drawer-actions .filter-drawer-close:hover {
+  opacity: 1;
+}
+
+.filter-drawer-header-clear {
+  padding: 6px 14px !important;
+  font-size: 13px !important;
+  border: none !important;
 }
 
 .filter-drawer-body {
@@ -513,9 +700,25 @@
   margin: 0;
 }
 
-.filter-drawer-clear {
+.filter-drawer-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   margin-top: 8px;
+}
+
+.filter-drawer-actions .btn-ghost {
   width: 100%;
+}
+
+.filter-drawer-apply {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: white !important;
+}
+
+.filter-drawer-apply:hover {
+  opacity: 0.9;
 }
 
 .recipe-grid {
@@ -632,7 +835,15 @@
   .filter-chips-desktop {
     display: none !important;
   }
-  .filter-icon-btn {
+  .filter-chips-wrap {
+    flex: 0;
+    min-width: 0;
+    width: 0;
+    overflow: hidden;
+    margin-right: -16px;
+  }
+  .filter-icon-btn,
+  .filter-icon-btn-placeholder {
     display: flex;
     flex-shrink: 0;
   }

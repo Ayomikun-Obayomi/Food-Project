@@ -243,9 +243,16 @@
 }
 
 .filter-chips-wrap {
-  position: relative;
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filter-chips-row {
+  position: relative;
+  flex-shrink: 0;
 }
 
 .filter-chips {
@@ -387,6 +394,67 @@
 .filter-chip-add:hover {
   border-color: var(--accent);
   background: var(--accent-subtle);
+}
+
+.filter-chip-add-filter {
+  align-self: flex-start;
+  padding: 8px 18px;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.filter-chip-add-filter:hover {
+  background: var(--accent-subtle);
+}
+
+.applied-filters-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.applied-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 14px;
+  background: var(--bg-elevated);
+  border: 2px dotted #2a2a2a;
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.applied-filter-label {
+  line-height: 1;
+}
+
+.applied-filter-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 50%;
+  transition: color 0.15s, background 0.15s;
+}
+
+.applied-filter-x:hover {
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.06);
 }
 
 .filter-chip-add-inline {
@@ -607,7 +675,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 140px 20px 20px 20px;
+  padding: 80px 48px 48px 48px;
   animation: fadeIn 0.2s ease;
   overflow: hidden;
 }
@@ -623,7 +691,7 @@
   width: 100%;
   min-height: 280px;
   max-width: min(480px, calc(100vw - 32px));
-  max-height: min(calc(100vh - 160px), 85vh);
+  max-height: min(calc(100vh - 128px), 88vh);
   overflow: hidden;
   padding-bottom: env(safe-area-inset-bottom);
   animation: modalIn 0.25s ease;
@@ -744,7 +812,7 @@
 
 .filter-drawer-chips .filter-chip {
   margin: 0;
-  padding: 8px 18px;
+  padding: 10px 20px;
 }
 
 .filter-drawer-actions {

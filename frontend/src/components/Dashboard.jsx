@@ -37,6 +37,7 @@ export default function Dashboard({ user, onLogout }) {
   const [showRefineModal, setShowRefineModal] = useState(false)
   const [activeFilter, setActiveFilter] = useState(null)
   const [subFilter, setSubFilter] = useState(null)
+  const [pendingSubFilter, setPendingSubFilter] = useState(null)
   const [customFilters, setCustomFilters] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('customMealFilters') || '[]')
@@ -101,6 +102,10 @@ export default function Dashboard({ user, onLogout }) {
   useEffect(() => {
     if (showAddFilterInput) addFilterInputRef.current?.focus()
   }, [showAddFilterInput])
+
+  useEffect(() => {
+    if (showFilterDrawer) setPendingSubFilter(subFilter)
+  }, [showFilterDrawer, subFilter])
 
   async function loadRecipes() {
     setLoading(true)
@@ -389,13 +394,14 @@ export default function Dashboard({ user, onLogout }) {
               {view === 'all' && (
                 <>
                   <div className="filter-chips-wrap">
+                    <div className="filter-chips-row">
                     <div className="filter-chips filter-chips-desktop" ref={filterChipsRef}>
                     <>
                       {mealCategories.map(meal => (
                         <button
                           key={meal}
                           className={`filter-chip ${activeFilter === meal ? 'active' : ''}`}
-                          onClick={() => { setActiveFilter(activeFilter === meal ? null : meal); setShowRefineModal(activeFilter === meal ? false : true) }}
+                          onClick={() => { setActiveFilter(activeFilter === meal ? null : meal); setShowRefineModal(false) }}
                         >
                           <span className="filter-chip-label">{meal}</span>
                           {customFilters.includes(meal) && (
@@ -467,6 +473,33 @@ export default function Dashboard({ user, onLogout }) {
                           <svg width="10" height="18" viewBox="0 0 10 18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M2 2l6 7-6 7" /></svg>
                         </span>
                       </button>
+                    )}
+                    </div>
+                    {activeFilter && (
+                      <div className="applied-filters-row">
+                        {activeFilter && (
+                          <button
+                            className="filter-chip-add-filter"
+                            onClick={() => setShowFilterDrawer(true)}
+                            aria-label="Add filter"
+                          >
+                            + Add filter
+                          </button>
+                        )}
+                        {subFilter && (
+                          <span className="applied-filter-chip">
+                            <span className="applied-filter-label">{capitalizeLabel(subFilter)}</span>
+                            <span
+                              className="applied-filter-x"
+                              onClick={() => setSubFilter(null)}
+                              role="button"
+                              aria-label={`Remove ${subFilter}`}
+                            >
+                              &times;
+                            </span>
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
                   <button
@@ -634,56 +667,6 @@ export default function Dashboard({ user, onLogout }) {
             </div>
             <div className="filter-drawer-body">
               <div className="filter-drawer-scroll">
-                <div className="filter-drawer-section">
-                  <label className="filter-drawer-label">Meal type</label>
-                  <div className="filter-drawer-chips">
-                    {mealCategories.map(meal => (
-                      <button
-                        key={meal}
-                        className={`filter-chip ${activeFilter === meal ? 'active' : ''}`}
-                        onClick={() => setActiveFilter(activeFilter === meal ? null : meal)}
-                      >
-                        <span className="filter-chip-label">{meal}</span>
-                        {customFilters.includes(meal) && (
-                          <span
-                            className="filter-chip-delete"
-                            onClick={e => handleRemoveCustomFilter(meal, e)}
-                            role="button"
-                            aria-label={`Remove ${meal} category`}
-                          >
-                            &times;
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                    {showAddFilterInput && showFilterDrawer ? (
-                      <span className="filter-chip-add-inline">
-                        <input
-                          ref={addFilterInputRef}
-                          type="text"
-                          value={addFilterValue}
-                          onChange={e => setAddFilterValue(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') handleAddCustomFilter()
-                            if (e.key === 'Escape') { setShowAddFilterInput(false); setAddFilterValue('') }
-                          }}
-                          onBlur={handleAddCustomFilter}
-                          placeholder="New category"
-                          maxLength={24}
-                          autoFocus
-                        />
-                      </span>
-                    ) : (
-                      <button
-                        className="filter-chip filter-chip-add"
-                        onClick={() => setShowAddFilterInput(true)}
-                        aria-label="Add custom category"
-                      >
-                        +
-                      </button>
-                    )}
-                  </div>
-                </div>
                 {subFilterSections.map(sec => (
                   <div key={sec.label} className="filter-drawer-section">
                     <label className="filter-drawer-label">{sec.label}</label>
@@ -691,8 +674,8 @@ export default function Dashboard({ user, onLogout }) {
                       {sec.filters.map(sf => (
                         <button
                           key={sf.label}
-                          className={`filter-chip sub ${subFilter === sf.label ? 'active' : ''}`}
-                          onClick={() => setSubFilter(subFilter === sf.label ? null : sf.label)}
+                          className={`filter-chip sub ${pendingSubFilter === sf.label ? 'active' : ''}`}
+                          onClick={() => setPendingSubFilter(pendingSubFilter === sf.label ? null : sf.label)}
                         >
                           {capitalizeLabel(sf.label)}
                         </button>
@@ -704,13 +687,13 @@ export default function Dashboard({ user, onLogout }) {
               <div className="filter-drawer-actions">
                 <button
                   className="filter-drawer-clear"
-                  onClick={() => { setActiveFilter(null); setSubFilter(null) }}
+                  onClick={() => { setActiveFilter(null); setSubFilter(null); setPendingSubFilter(null); setShowFilterDrawer(false) }}
                 >
                   Clear
                 </button>
                 <button
                   className="filter-drawer-apply"
-                  onClick={() => setShowFilterDrawer(false)}
+                  onClick={() => { setSubFilter(pendingSubFilter); setShowFilterDrawer(false) }}
                 >
                   Apply
                 </button>

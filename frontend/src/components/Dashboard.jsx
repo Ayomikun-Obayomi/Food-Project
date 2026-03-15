@@ -253,6 +253,7 @@ export default function Dashboard({ user, onLogout }) {
   }, [activeFilter, mealRecipes])
 
   const subFilterSections = useMemo(() => {
+    if (!activeFilter) return []
     const sections = []
     const recipesToUse = mealRecipes
     const quickCount = recipesToUse.filter(r => r.cook_time_minutes && r.cook_time_minutes <= 15).length

@@ -722,6 +722,12 @@
   display: none;
 }
 
+@media (min-width: 769px) {
+  .filter-drawer-meal-type {
+    display: none;
+  }
+}
+
 .filter-drawer-header {
   display: flex;
   align-items: center;

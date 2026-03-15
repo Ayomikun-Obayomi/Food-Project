@@ -667,6 +667,56 @@ export default function Dashboard({ user, onLogout }) {
             </div>
             <div className="filter-drawer-body">
               <div className="filter-drawer-scroll">
+                <div className="filter-drawer-section filter-drawer-meal-type">
+                  <label className="filter-drawer-label">Meal type</label>
+                  <div className="filter-drawer-chips">
+                    {mealCategories.map(meal => (
+                      <button
+                        key={meal}
+                        className={`filter-chip ${activeFilter === meal ? 'active' : ''}`}
+                        onClick={() => setActiveFilter(activeFilter === meal ? null : meal)}
+                      >
+                        <span className="filter-chip-label">{meal}</span>
+                        {customFilters.includes(meal) && (
+                          <span
+                            className="filter-chip-delete"
+                            onClick={e => handleRemoveCustomFilter(meal, e)}
+                            role="button"
+                            aria-label={`Remove ${meal} category`}
+                          >
+                            &times;
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                    {showAddFilterInput && showFilterDrawer ? (
+                      <span className="filter-chip-add-inline">
+                        <input
+                          ref={addFilterInputRef}
+                          type="text"
+                          value={addFilterValue}
+                          onChange={e => setAddFilterValue(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') handleAddCustomFilter()
+                            if (e.key === 'Escape') { setShowAddFilterInput(false); setAddFilterValue('') }
+                          }}
+                          onBlur={handleAddCustomFilter}
+                          placeholder="New category"
+                          maxLength={24}
+                          autoFocus
+                        />
+                      </span>
+                    ) : (
+                      <button
+                        className="filter-chip filter-chip-add"
+                        onClick={() => setShowAddFilterInput(true)}
+                        aria-label="Add custom category"
+                      >
+                        +
+                      </button>
+                    )}
+                  </div>
+                </div>
                 {subFilterSections.map(sec => (
                   <div key={sec.label} className="filter-drawer-section">
                     <label className="filter-drawer-label">{sec.label}</label>

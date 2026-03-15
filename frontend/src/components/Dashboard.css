@@ -1070,12 +1070,16 @@
     grid-template-columns: 1fr;
   }
 
-  /* Filter modal – standard centered modal on mobile (no top-offset centering) */
+  /* Filter modal – right underneath search bar on mobile */
   .filter-drawer-overlay {
-    padding: 20px;
+    padding: 150px 20px 20px 20px;
+    align-items: flex-start;
+    justify-content: center;
   }
   .filter-drawer {
-    max-height: calc(100vh - 40px);
+    max-height: calc(100vh - 170px);
+    margin: 0;
+    align-self: stretch;
   }
 
   /* Filter modal pills – mobile touch targets and readability */

@@ -620,6 +620,7 @@
   background: var(--bg-card);
   border-radius: var(--radius-lg);
   width: 100%;
+  min-height: 420px;
   max-width: min(480px, calc(100vw - 32px));
   max-height: min(calc(100vh - 160px), 85vh);
   overflow-y: auto;
@@ -628,6 +629,8 @@
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
   margin: auto;
   align-self: center;
+  display: flex;
+  flex-direction: column;
 }
 
 @keyframes modalIn {
@@ -704,6 +707,10 @@
 
 .filter-drawer-body {
   padding: 8px 20px 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .filter-drawer-section {
@@ -735,14 +742,12 @@
   display: flex;
   flex-direction: row;
   gap: 12px;
-  margin-top: 20px;
+  margin-top: auto;
   padding: 16px 0 0;
   padding-bottom: env(safe-area-inset-bottom);
   border-top: 1px solid var(--border);
-  position: sticky;
-  bottom: 0;
+  flex-shrink: 0;
   background: var(--bg-card);
-  z-index: 1;
 }
 
 .filter-drawer-apply {

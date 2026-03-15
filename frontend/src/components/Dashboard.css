@@ -607,7 +607,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: 140px 20px 20px 20px;
   animation: fadeIn 0.2s ease;
 }
 
@@ -626,6 +626,8 @@
   padding-bottom: env(safe-area-inset-bottom);
   animation: modalIn 0.25s ease;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+  margin: auto;
+  align-self: center;
 }
 
 @keyframes modalIn {
@@ -1056,5 +1058,22 @@
   }
   .recipe-grid {
     grid-template-columns: 1fr;
+  }
+
+  /* Filter modal pills – mobile touch targets and readability */
+  .filter-drawer-chips .filter-chip {
+    min-height: 44px;
+    padding: 10px 20px;
+    font-size: 14px;
+  }
+
+  .filter-drawer-chips .filter-chip-add {
+    min-height: 44px;
+    padding: 10px 20px;
+    font-size: 20px;
+  }
+
+  .filter-drawer-chips .filter-chip.sub {
+    min-height: 44px;
   }
 }

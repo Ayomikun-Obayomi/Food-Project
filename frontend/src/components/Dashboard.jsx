@@ -75,8 +75,16 @@ export default function Dashboard({ user, onLogout }) {
       }
     }
     if (showFilterDrawer) {
+      const prevBody = document.body.style.overflow
+      const prevHtml = document.documentElement.style.overflow
+      document.body.style.overflow = 'hidden'
+      document.documentElement.style.overflow = 'hidden'
       document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
+      return () => {
+        document.body.style.overflow = prevBody
+        document.documentElement.style.overflow = prevHtml
+        document.removeEventListener('mousedown', handleClickOutside)
+      }
     }
   }, [showFilterDrawer])
 

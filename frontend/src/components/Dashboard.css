@@ -314,14 +314,16 @@
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 16px;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 18px;
   background: var(--bg-elevated, #f0f0f0);
   border: none;
   border-radius: 100px;
   color: var(--text-secondary);
   font-size: 13px;
   font-weight: 500;
+  line-height: 1;
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.15s, color 0.15s;
@@ -330,6 +332,11 @@
 .filter-chip.active {
   background: var(--text);
   color: var(--bg);
+}
+
+.filter-chip.active .filter-chip-x {
+  color: rgba(0, 0, 0, 0.65);
+  opacity: 1;
 }
 
 .filter-chip:hover:not(.active) {
@@ -353,16 +360,24 @@
   color: var(--text);
 }
 
-.filter-chip-x {
-  font-size: 15px;
+.filter-chip-x,
+.filter-chip-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
   line-height: 1;
-  opacity: 0.7;
+}
+
+.filter-chip-x {
+  font-size: 18px;
+  font-weight: 400;
 }
 
 .filter-chip-add {
   padding: 7px 14px;
   color: var(--accent);
-  font-size: 16px;
+  font-size: 22px;
 }
 
 .filter-chip-add:hover {
@@ -395,9 +410,12 @@
 }
 
 .filter-chip-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   margin-left: 4px;
   padding: 0;
-  font-size: 16px;
+  font-size: 20px;
   line-height: 1;
   opacity: 0.6;
   cursor: pointer;
@@ -722,6 +740,151 @@
 
 .filter-drawer-apply:hover {
   opacity: 0.9;
+}
+
+/* ── Add category (mobile flow) ──────────────────────────────────────────── */
+
+.add-category-screen-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 160;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+
+.add-category-screen {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: 60vh;
+  background: var(--bg-card);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  animation: slideUp 0.25s ease;
+}
+
+.add-category-screen-handle {
+  width: 40px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 12px auto;
+}
+
+.add-category-screen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.add-category-screen-back {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  margin: -8px 0 0 -8px;
+  border-radius: 50%;
+  transition: background 0.15s;
+}
+
+.add-category-screen-back:hover {
+  background: var(--bg-elevated);
+}
+
+.add-category-screen-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.add-category-screen-add {
+  padding: 8px 16px;
+  font-size: 15px;
+  font-weight: 500;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  color: white;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.add-category-screen-add:hover {
+  opacity: 0.9;
+}
+
+.add-category-screen-close {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 24px;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: background 0.15s, color 0.15s;
+}
+
+.add-category-screen-close:hover {
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
+.add-category-screen-body {
+  flex: 1;
+  padding: 24px 20px;
+}
+
+.add-category-screen-body .add-category-input {
+  margin-bottom: 16px;
+}
+
+.add-category-screen-body .add-category-screen-add {
+  width: 100%;
+  padding: 14px 16px;
+}
+
+.add-category-screen-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.add-category-input {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  box-sizing: border-box;
+}
+
+.add-category-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.add-category-input::placeholder {
+  color: var(--text-muted);
 }
 
 .recipe-grid {

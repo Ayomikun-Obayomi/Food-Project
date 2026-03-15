@@ -245,10 +245,10 @@ export default function Dashboard({ user, onLogout }) {
   }, [activeFilter, mealRecipes])
 
   const subFilterSections = useMemo(() => {
-    if (!activeFilter) return []
     const sections = []
-    const quickCount = mealRecipes.filter(r => r.cook_time_minutes && r.cook_time_minutes <= 15).length
-    const under30Count = mealRecipes.filter(r => r.cook_time_minutes && r.cook_time_minutes <= 30).length
+    const recipesToUse = mealRecipes
+    const quickCount = recipesToUse.filter(r => r.cook_time_minutes && r.cook_time_minutes <= 15).length
+    const under30Count = recipesToUse.filter(r => r.cook_time_minutes && r.cook_time_minutes <= 30).length
     const cookTime = []
     if (quickCount > 0) cookTime.push({ label: 'Quick & Easy', field: 'quick' })
     if (under30Count > quickCount) cookTime.push({ label: 'Under 30 min', field: 'under30' })
@@ -256,7 +256,7 @@ export default function Dashboard({ user, onLogout }) {
 
     const cuisines = []
     const cuisineSeen = new Set()
-    for (const r of mealRecipes) {
+    for (const r of recipesToUse) {
       if (r.cuisine && !cuisineSeen.has(r.cuisine)) {
         cuisineSeen.add(r.cuisine)
         cuisines.push({ label: r.cuisine, field: 'cuisine' })
@@ -266,7 +266,7 @@ export default function Dashboard({ user, onLogout }) {
 
     const diets = []
     const dietSeen = new Set()
-    for (const r of mealRecipes) {
+    for (const r of recipesToUse) {
       for (const d of (r.diet_labels || [])) {
         if (!dietSeen.has(d)) {
           dietSeen.add(d)
@@ -674,7 +674,7 @@ export default function Dashboard({ user, onLogout }) {
                   )}
                 </div>
               </div>
-              {activeFilter && subFilterSections.map(sec => (
+              {subFilterSections.map(sec => (
                 <div key={sec.label} className="filter-drawer-section">
                   <label className="filter-drawer-label">{sec.label}</label>
                   <div className="filter-drawer-chips">

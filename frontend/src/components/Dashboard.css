@@ -597,7 +597,7 @@
   color: white !important;
 }
 
-/* ── Filter drawer (mobile) ────────────────────────────────────────────── */
+/* ── Filter modal (mobile) ─────────────────────────────────────────────── */
 
 .filter-drawer-overlay {
   position: fixed;
@@ -605,9 +605,9 @@
   background: rgba(0, 0, 0, 0.5);
   z-index: 150;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-  padding: 0;
+  padding: 20px;
   animation: fadeIn 0.2s ease;
 }
 
@@ -618,13 +618,25 @@
 
 .filter-drawer {
   background: var(--bg-card);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  border-radius: var(--radius-lg);
   width: 100%;
-  height: 85vh;
-  max-height: 90vh;
+  max-width: min(480px, calc(100vw - 32px));
+  max-height: calc(100vh - 40px);
   overflow-y: auto;
-  padding-bottom: calc(24px + env(safe-area-inset-bottom));
-  animation: slideUp 0.25s ease;
+  padding-bottom: env(safe-area-inset-bottom);
+  animation: modalIn 0.25s ease;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 @keyframes slideUp {
@@ -633,18 +645,14 @@
 }
 
 .filter-drawer-handle {
-  width: 40px;
-  height: 4px;
-  background: var(--border);
-  border-radius: 2px;
-  margin: 12px auto;
+  display: none;
 }
 
 .filter-drawer-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px 16px;
+  padding: 20px 20px 8px;
 }
 
 .filter-drawer-header h3 {
@@ -693,7 +701,7 @@
 }
 
 .filter-drawer-body {
-  padding: 0 20px 20px;
+  padding: 8px 20px 20px;
 }
 
 .filter-drawer-section {
@@ -718,6 +726,7 @@
 
 .filter-drawer-chips .filter-chip {
   margin: 0;
+  padding: 8px 18px;
 }
 
 .filter-drawer-actions {

@@ -43,14 +43,11 @@ export default function Dashboard({ user, onLogout }) {
     } catch { return [] }
   })
   const [showAddFilterInput, setShowAddFilterInput] = useState(false)
-  const [showAddCategoryDrawer, setShowAddCategoryDrawer] = useState(false)
   const [addFilterValue, setAddFilterValue] = useState('')
   const profileRef = useRef(null)
   const filterRef = useRef(null)
   const refineModalRef = useRef(null)
-  const addCategoryDrawerRef = useRef(null)
   const addFilterInputRef = useRef(null)
-  const addCategoryInputRef = useRef(null)
   const filterChipsRef = useRef(null)
   const [scrollState, setScrollState] = useState({ canScrollLeft: false, canScrollRight: false })
   const fileUploadRef = useRef(null)
@@ -92,26 +89,6 @@ export default function Dashboard({ user, onLogout }) {
       return () => document.removeEventListener('keydown', handleEsc)
     }
   }, [showRefineModal])
-
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (addCategoryDrawerRef.current && !addCategoryDrawerRef.current.contains(e.target)) {
-        setShowAddCategoryDrawer(false)
-      }
-    }
-    function handleEsc(e) {
-      if (e.key === 'Escape') setShowAddCategoryDrawer(false)
-    }
-    if (showAddCategoryDrawer) {
-      addCategoryInputRef.current?.focus()
-      document.addEventListener('mousedown', handleClickOutside)
-      document.addEventListener('keydown', handleEsc)
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside)
-        document.removeEventListener('keydown', handleEsc)
-      }
-    }
-  }, [showAddCategoryDrawer])
 
   useEffect(() => {
     if (showAddFilterInput) addFilterInputRef.current?.focus()
@@ -225,7 +202,6 @@ export default function Dashboard({ user, onLogout }) {
     }
     setAddFilterValue('')
     setShowAddFilterInput(false)
-    setShowAddCategoryDrawer(false)
   }
 
   function handleRemoveCustomFilter(name, e) {
@@ -412,6 +388,7 @@ export default function Dashboard({ user, onLogout }) {
                           className={`filter-chip ${activeFilter === meal ? 'active' : ''}`}
                           onClick={() => { setActiveFilter(activeFilter === meal ? null : meal); setShowRefineModal(activeFilter === meal ? false : true) }}
                         >
+                          <span className="filter-chip-label">{meal}</span>
                           {customFilters.includes(meal) && (
                             <span
                               className="filter-chip-x"
@@ -422,10 +399,9 @@ export default function Dashboard({ user, onLogout }) {
                               &times;
                             </span>
                           )}
-                          <span className="filter-chip-label">{meal}</span>
                         </button>
                       ))}
-                      {showAddFilterInput ? (
+                      {showAddFilterInput && !showFilterDrawer ? (
                         <span className="filter-chip-add-inline">
                           <input
                             ref={addFilterInputRef}
@@ -670,13 +646,32 @@ export default function Dashboard({ user, onLogout }) {
                       )}
                     </button>
                   ))}
-                  <button
-                    className="filter-chip filter-chip-add"
-                    onClick={() => { setShowFilterDrawer(false); setShowAddCategoryDrawer(true) }}
-                    aria-label="Add custom category"
-                  >
-                    +
-                  </button>
+                  {showAddFilterInput && showFilterDrawer ? (
+                    <span className="filter-chip-add-inline">
+                      <input
+                        ref={addFilterInputRef}
+                        type="text"
+                        value={addFilterValue}
+                        onChange={e => setAddFilterValue(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') handleAddCustomFilter()
+                          if (e.key === 'Escape') { setShowAddFilterInput(false); setAddFilterValue('') }
+                        }}
+                        onBlur={handleAddCustomFilter}
+                        placeholder="New category"
+                        maxLength={24}
+                        autoFocus
+                      />
+                    </span>
+                  ) : (
+                    <button
+                      className="filter-chip filter-chip-add"
+                      onClick={() => setShowAddFilterInput(true)}
+                      aria-label="Add custom category"
+                    >
+                      +
+                    </button>
+                  )}
                 </div>
               </div>
               {activeFilter && subFilterSections.map(sec => (
@@ -709,53 +704,6 @@ export default function Dashboard({ user, onLogout }) {
                   Apply
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showAddCategoryDrawer && (
-        <div className="add-category-screen-overlay" onClick={() => { setShowAddCategoryDrawer(false); setAddFilterValue(''); setShowFilterDrawer(true) }}>
-          <div className="add-category-screen" ref={addCategoryDrawerRef} onClick={e => e.stopPropagation()}>
-            <div className="add-category-screen-handle" />
-            <div className="add-category-screen-header">
-              <button
-                className="add-category-screen-back"
-                onClick={() => { setShowAddCategoryDrawer(false); setAddFilterValue(''); setShowFilterDrawer(true) }}
-                aria-label="Back"
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
-              </button>
-              <button
-                className="add-category-screen-close"
-                onClick={() => { setShowAddCategoryDrawer(false); setAddFilterValue(''); setShowFilterDrawer(true) }}
-                aria-label="Cancel"
-              >
-                &times;
-              </button>
-            </div>
-            <div className="add-category-screen-body">
-              <label className="add-category-screen-label">Add category</label>
-              <input
-                ref={addCategoryInputRef}
-                type="text"
-                value={addFilterValue}
-                onChange={e => setAddFilterValue(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') handleAddCustomFilter()
-                  if (e.key === 'Escape') { setShowAddCategoryDrawer(false); setAddFilterValue('') }
-                }}
-                placeholder="New category name"
-                maxLength={24}
-                className="add-category-input"
-                autoFocus
-              />
-              <button
-                className="add-category-screen-add"
-                onClick={() => { handleAddCustomFilter(); setShowFilterDrawer(true) }}
-              >
-                Add
-              </button>
             </div>
           </div>
         </div>

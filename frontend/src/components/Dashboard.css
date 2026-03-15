@@ -378,6 +378,10 @@
   padding: 7px 14px;
   color: var(--accent);
   font-size: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .filter-chip-add:hover {

@@ -1,10 +1,21 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { getRecipes, getRecipe, searchRecipes, deleteRecipe, toggleFlags, updateRecipeMealType, imageSearch } from '../api'
 import SearchBar from './SearchBar'
 import RecipeCard from './RecipeCard'
 import RecipeDetail from './RecipeDetail'
 import AddRecipe from './AddRecipe'
 import './Dashboard.css'
+
+/** Built-in bookmark chips; user-created names live in `customFilters` (localStorage). */
+const BASE_BOOKMARK_CATEGORIES = ['Breakfast', 'Lunch', 'Snack', 'Dinner']
+
+function bookmarkSnackLabel(previousMealType, newMealType) {
+  const prev = previousMealType || ''
+  const next = newMealType || ''
+  if (!next && prev) return 'Bookmark removed'
+  if (next && !prev) return `Saved to ${next}`
+  return `Moved to ${next}`
+}
 
 function capitalizeLabel(str) {
   if (!str || typeof str !== 'string') return str
@@ -49,9 +60,19 @@ export default function Dashboard({ user, onLogout }) {
   const filterRef = useRef(null)
   const refineModalRef = useRef(null)
   const addFilterInputRef = useRef(null)
+  const editBookmarkInputRef = useRef(null)
+  const filterChipClickTimerRef = useRef(null)
   const filterChipsRef = useRef(null)
+  /** Separate refs so React never overwrites one inline pill with another (Done must stay “inside”). */
+  const toolbarRenameInlineRef = useRef(null)
+  const toolbarAddInlineRef = useRef(null)
+  const drawerRenameInlineRef = useRef(null)
+  const drawerAddInlineRef = useRef(null)
   const [scrollState, setScrollState] = useState({ canScrollLeft: false, canScrollRight: false })
   const fileUploadRef = useRef(null)
+  const [bookmarkSnack, setBookmarkSnack] = useState(null)
+  const [editingBookmark, setEditingBookmark] = useState(null)
+  const [editBookmarkValue, setEditBookmarkValue] = useState('')
 
   useEffect(() => {
     localStorage.setItem('customMealFilters', JSON.stringify(customFilters))
@@ -102,6 +123,36 @@ export default function Dashboard({ user, onLogout }) {
   useEffect(() => {
     if (showAddFilterInput) addFilterInputRef.current?.focus()
   }, [showAddFilterInput])
+
+  useEffect(() => {
+    if (editingBookmark) editBookmarkInputRef.current?.focus()
+  }, [editingBookmark])
+
+  useEffect(() => {
+    if (!showAddFilterInput && !editingBookmark) return
+    function handleMouseDown(e) {
+      const t = e.target
+      if (!(t instanceof Node)) return
+      if (toolbarRenameInlineRef.current?.contains(t)) return
+      if (toolbarAddInlineRef.current?.contains(t)) return
+      if (drawerRenameInlineRef.current?.contains(t)) return
+      if (drawerAddInlineRef.current?.contains(t)) return
+      if (showAddFilterInput) {
+        setShowAddFilterInput(false)
+        setAddFilterValue('')
+      }
+      if (editingBookmark) {
+        setEditingBookmark(null)
+        setEditBookmarkValue('')
+      }
+    }
+    document.addEventListener('mousedown', handleMouseDown)
+    return () => document.removeEventListener('mousedown', handleMouseDown)
+  }, [showAddFilterInput, editingBookmark])
+
+  useEffect(() => () => {
+    if (filterChipClickTimerRef.current) clearTimeout(filterChipClickTimerRef.current)
+  }, [])
 
   useEffect(() => {
     if (showFilterDrawer) setPendingSubFilter(subFilter)
@@ -173,21 +224,49 @@ export default function Dashboard({ user, onLogout }) {
     }
   }
 
-  async function handleUpdateMealType(id, mealType) {
+  const handleUpdateMealType = useCallback(async (id, mealType, previousMealType, options = {}) => {
+    const { skipSnack } = options
+    const hasPrev = previousMealType !== undefined
+    const prev = hasPrev ? previousMealType : null
+    const next = mealType === undefined ? null : mealType
+    const same = hasPrev
+      && (prev || '').toString().toLowerCase() === (next || '').toString().toLowerCase()
+    if (same) return
+
     try {
       const updated = await updateRecipeMealType(id, mealType)
       const update = list => list.map(r => String(r.id) === String(id) ? updated : r)
       setRecipes(update)
       if (searchResults) {
-        setSearchResults(prev => ({ ...prev, recipes: update(prev.recipes) }))
+        setSearchResults(prevState => ({ ...prevState, recipes: update(prevState.recipes) }))
       }
       if (selectedRecipe?.id === id) setSelectedRecipe(updated)
       if (mealType && activeFilter) {
         setActiveFilter(mealType)
       }
+      if (!skipSnack && hasPrev) {
+        setBookmarkSnack({
+          recipeId: id,
+          restoreMealType: prev,
+          newMealType: next,
+        })
+      }
     } catch (err) {
       console.error('Update meal type failed:', err)
     }
+  }, [activeFilter, searchResults, selectedRecipe?.id])
+
+  useEffect(() => {
+    if (!bookmarkSnack) return
+    const t = setTimeout(() => setBookmarkSnack(null), 12000)
+    return () => clearTimeout(t)
+  }, [bookmarkSnack])
+
+  async function handleUndoBookmark() {
+    if (!bookmarkSnack) return
+    const { recipeId, restoreMealType } = bookmarkSnack
+    setBookmarkSnack(null)
+    await handleUpdateMealType(recipeId, restoreMealType, undefined, { skipSnack: true })
   }
 
   async function handleSelectSuggestedRecipe(suggestedRecipe) {
@@ -214,18 +293,17 @@ export default function Dashboard({ user, onLogout }) {
 
   const likedCount = recipes.filter(r => r.is_liked).length
 
-  const baseBookmarkCategories = ['Breakfast', 'Lunch', 'Snack', 'Dinner']
   const bookmarkCategories = useMemo(() => {
-    const baseLower = baseBookmarkCategories.map(b => b.toLowerCase())
+    const baseLower = BASE_BOOKMARK_CATEGORIES.map(b => b.toLowerCase())
     const customOnly = customFilters.filter(c => !baseLower.includes(c.toLowerCase()))
-    return [...baseBookmarkCategories, ...customOnly]
+    return [...BASE_BOOKMARK_CATEGORIES, ...customOnly]
   }, [customFilters])
 
   function handleAddBookmark(name) {
     const trimmed = (typeof name === 'string' ? name : addFilterValue).trim()
     if (trimmed && trimmed.length <= 24) {
       const normalized = trimmed.toLowerCase()
-      const exists = [...baseBookmarkCategories, ...customFilters].some(m => m.toLowerCase() === normalized)
+      const exists = [...BASE_BOOKMARK_CATEGORIES, ...customFilters].some(m => m.toLowerCase() === normalized)
       if (!exists) setCustomFilters(prev => [...prev, trimmed])
     }
     setAddFilterValue('')
@@ -238,13 +316,105 @@ export default function Dashboard({ user, onLogout }) {
 
   function handleRemoveBookmark(name, e) {
     e?.stopPropagation()
-    if (baseBookmarkCategories.includes(name)) return
+    if (BASE_BOOKMARK_CATEGORIES.includes(name)) return
     setCustomFilters(prev => prev.filter(f => f !== name))
     if (activeFilter === name) setActiveFilter(null)
   }
 
   function isCustomBookmark(name) {
     return customFilters.includes(name)
+  }
+
+  const handleRenameBookmark = useCallback(async (oldName, newName) => {
+    const trimmed = (typeof newName === 'string' ? newName : '').trim()
+    if (!trimmed || trimmed.length > 24) return false
+    /* Only skip when the string is literally unchanged. Case/spacing fixes must still persist. */
+    if (trimmed === oldName) return true
+    const allNames = [...BASE_BOOKMARK_CATEGORIES, ...customFilters]
+    const duplicate = allNames.some(
+      m => m.toLowerCase() === trimmed.toLowerCase() && m.toLowerCase() !== oldName.toLowerCase()
+    )
+    if (duplicate) {
+      window.alert('A bookmark with that name already exists.')
+      return false
+    }
+    if (!customFilters.some(f => f.toLowerCase() === oldName.toLowerCase())) {
+      window.alert('Built-in bookmarks can’t be renamed.')
+      return false
+    }
+
+    const affectedIds = recipes
+      .filter(r => (r.meal_type || '').toLowerCase() === oldName.toLowerCase())
+      .map(r => r.id)
+
+    try {
+      await Promise.all(affectedIds.map(id => updateRecipeMealType(id, trimmed)))
+    } catch (err) {
+      console.error('Rename bookmark failed:', err)
+      window.alert('Couldn’t rename bookmark. Try again.')
+      return false
+    }
+
+    const patch = r =>
+      (r.meal_type || '').toLowerCase() === oldName.toLowerCase()
+        ? { ...r, meal_type: trimmed }
+        : r
+
+    setRecipes(prev => prev.map(patch))
+    if (searchResults) {
+      setSearchResults(prev => ({ ...prev, recipes: prev.recipes.map(patch) }))
+    }
+    if (selectedRecipe && (selectedRecipe.meal_type || '').toLowerCase() === oldName.toLowerCase()) {
+      setSelectedRecipe({ ...selectedRecipe, meal_type: trimmed })
+    }
+    setCustomFilters(prev =>
+      prev.map(f => (f.toLowerCase() === oldName.toLowerCase() ? trimmed : f))
+    )
+    if (activeFilter && activeFilter.toLowerCase() === oldName.toLowerCase()) {
+      setActiveFilter(trimmed)
+    }
+    return true
+  }, [recipes, customFilters, searchResults, selectedRecipe, activeFilter])
+
+  async function commitBookmarkRename() {
+    if (!editingBookmark) return
+    const ok = await handleRenameBookmark(editingBookmark, editBookmarkValue)
+    if (ok !== false) {
+      setEditingBookmark(null)
+      setEditBookmarkValue('')
+    }
+  }
+
+  function cancelBookmarkRename() {
+    setEditingBookmark(null)
+    setEditBookmarkValue('')
+  }
+
+  /** Single-click toggles filter; double-click (custom only) opens rename — same layout as “new bookmark”. */
+  function handleFilterChipClick(meal, e) {
+    if (!isCustomBookmark(meal)) {
+      setActiveFilter(prev => (prev === meal ? null : meal))
+      setShowRefineModal(false)
+      return
+    }
+    if (e.detail === 2) {
+      if (filterChipClickTimerRef.current) {
+        clearTimeout(filterChipClickTimerRef.current)
+        filterChipClickTimerRef.current = null
+      }
+      setShowAddFilterInput(false)
+      setAddFilterValue('')
+      setEditingBookmark(meal)
+      setEditBookmarkValue(meal)
+      return
+    }
+    if (e.detail === 1) {
+      filterChipClickTimerRef.current = setTimeout(() => {
+        filterChipClickTimerRef.current = null
+        setActiveFilter(prev => (prev === meal ? null : meal))
+        setShowRefineModal(false)
+      }, 280)
+    }
   }
 
   const baseRecipes = view === 'liked' ? recipes.filter(r => r.is_liked) : recipes
@@ -422,37 +592,87 @@ export default function Dashboard({ user, onLogout }) {
                     <div className="filter-chips filter-chips-desktop" ref={filterChipsRef}>
                     <>
                       {bookmarkCategories.map(meal => (
-                        <button
-                          key={meal}
-                          className={`filter-chip ${activeFilter === meal ? 'active' : ''}`}
-                          onClick={() => { setActiveFilter(activeFilter === meal ? null : meal); setShowRefineModal(false) }}
-                        >
-                          <span className="filter-chip-label">{meal}</span>
-                          {isCustomBookmark(meal) && (
-                            <span
-                              className="filter-chip-x"
-                              onClick={e => handleRemoveBookmark(meal, e)}
-                              role="button"
-                              aria-label={`Remove ${meal} bookmark`}
+                        editingBookmark === meal && !showFilterDrawer ? (
+                          <span
+                            key={meal}
+                            ref={toolbarRenameInlineRef}
+                            className="filter-chip filter-chip-add-inline filter-chip-rename-inline"
+                          >
+                            <input
+                              ref={editBookmarkInputRef}
+                              type="text"
+                              value={editBookmarkValue}
+                              onChange={e => setEditBookmarkValue(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  void commitBookmarkRename()
+                                }
+                                if (e.key === 'Escape') {
+                                  e.preventDefault()
+                                  cancelBookmarkRename()
+                                }
+                              }}
+                              maxLength={24}
+                              placeholder="Bookmark name"
+                              aria-label="Rename bookmark"
+                            />
+                            <button
+                              type="button"
+                              className="filter-chip-done-btn"
+                              onClick={e => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                void commitBookmarkRename()
+                              }}
                             >
-                              &times;
-                            </span>
-                          )}
-                        </button>
+                              Done
+                            </button>
+                          </span>
+                        ) : (
+                          <button
+                            key={meal}
+                            type="button"
+                            className={`filter-chip ${activeFilter === meal ? 'active' : ''}`}
+                            onClick={e => handleFilterChipClick(meal, e)}
+                            title={isCustomBookmark(meal) ? 'Double-click to rename' : undefined}
+                          >
+                            <span className="filter-chip-label">{meal}</span>
+                            {isCustomBookmark(meal) && (
+                              <span
+                                className="filter-chip-x"
+                                onClick={e => handleRemoveBookmark(meal, e)}
+                                role="button"
+                                aria-label={`Remove ${meal} bookmark`}
+                              >
+                                &times;
+                              </span>
+                            )}
+                          </button>
+                        )
                       ))}
                       {showAddFilterInput && !showFilterDrawer ? (
-                        <span className="filter-chip-add-inline">
+                        <span ref={toolbarAddInlineRef} className="filter-chip-add-inline">
                           <input
                             ref={addFilterInputRef}
                             type="text"
                             value={addFilterValue}
                             onChange={e => setAddFilterValue(e.target.value)}
                             onKeyDown={e => {
-                              if (e.key === 'Enter') handleAddCustomFilter()
-                              if (e.key === 'Escape') { setShowAddFilterInput(false); setAddFilterValue('') }
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleAddCustomFilter()
+                              }
+                              if (e.key === 'Escape') {
+                                e.preventDefault()
+                                setShowAddFilterInput(false)
+                                setAddFilterValue('')
+                              }
                             }}
-                            onBlur={handleAddCustomFilter}
                             placeholder="New bookmark"
+                            title="Enter to add · click outside to cancel"
                             maxLength={24}
                             autoFocus
                           />
@@ -460,7 +680,11 @@ export default function Dashboard({ user, onLogout }) {
                       ) : (
                         <button
                           className="filter-chip filter-chip-add"
-                          onClick={() => setShowAddFilterInput(true)}
+                          onClick={() => {
+                            setEditingBookmark(null)
+                            setEditBookmarkValue('')
+                            setShowAddFilterInput(true)
+                          }}
                           aria-label="Add bookmark"
                         >
                           +
@@ -578,6 +802,8 @@ export default function Dashboard({ user, onLogout }) {
                 bookmarkCategories={bookmarkCategories}
                 onUpdateMealType={handleUpdateMealType}
                 onAddBookmark={handleAddBookmark}
+                isBookmarkEditable={isCustomBookmark}
+                onRenameBookmark={handleRenameBookmark}
               />
             ))}
           </div>
@@ -698,37 +924,87 @@ export default function Dashboard({ user, onLogout }) {
                   <label className="filter-drawer-label">Bookmark</label>
                   <div className="filter-drawer-chips">
                     {bookmarkCategories.map(meal => (
-                      <button
-                        key={meal}
-                        className={`filter-chip ${activeFilter === meal ? 'active' : ''}`}
-                        onClick={() => setActiveFilter(activeFilter === meal ? null : meal)}
-                      >
-                        <span className="filter-chip-label">{meal}</span>
-                        {isCustomBookmark(meal) && (
-                          <span
-                            className="filter-chip-delete"
-                            onClick={e => handleRemoveBookmark(meal, e)}
-                            role="button"
-                            aria-label={`Remove ${meal} bookmark`}
+                      editingBookmark === meal && showFilterDrawer ? (
+                        <span
+                          key={meal}
+                          ref={drawerRenameInlineRef}
+                          className="filter-chip filter-chip-add-inline filter-chip-rename-inline"
+                        >
+                          <input
+                            ref={editBookmarkInputRef}
+                            type="text"
+                            value={editBookmarkValue}
+                            onChange={e => setEditBookmarkValue(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                void commitBookmarkRename()
+                              }
+                              if (e.key === 'Escape') {
+                                e.preventDefault()
+                                cancelBookmarkRename()
+                              }
+                            }}
+                            maxLength={24}
+                            placeholder="Bookmark name"
+                            aria-label="Rename bookmark"
+                          />
+                          <button
+                            type="button"
+                            className="filter-chip-done-btn"
+                            onClick={e => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              void commitBookmarkRename()
+                            }}
                           >
-                            &times;
-                          </span>
-                        )}
-                      </button>
+                            Done
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          key={meal}
+                          type="button"
+                          className={`filter-chip ${activeFilter === meal ? 'active' : ''}`}
+                          onClick={e => handleFilterChipClick(meal, e)}
+                          title={isCustomBookmark(meal) ? 'Double-click to rename' : undefined}
+                        >
+                          <span className="filter-chip-label">{meal}</span>
+                          {isCustomBookmark(meal) && (
+                            <span
+                              className="filter-chip-delete"
+                              onClick={e => handleRemoveBookmark(meal, e)}
+                              role="button"
+                              aria-label={`Remove ${meal} bookmark`}
+                            >
+                              &times;
+                            </span>
+                          )}
+                        </button>
+                      )
                     ))}
                     {showAddFilterInput && showFilterDrawer ? (
-                      <span className="filter-chip-add-inline">
+                      <span ref={drawerAddInlineRef} className="filter-chip-add-inline">
                         <input
                           ref={addFilterInputRef}
                           type="text"
                           value={addFilterValue}
                           onChange={e => setAddFilterValue(e.target.value)}
                           onKeyDown={e => {
-                            if (e.key === 'Enter') handleAddCustomFilter()
-                            if (e.key === 'Escape') { setShowAddFilterInput(false); setAddFilterValue('') }
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              handleAddCustomFilter()
+                            }
+                            if (e.key === 'Escape') {
+                              e.preventDefault()
+                              setShowAddFilterInput(false)
+                              setAddFilterValue('')
+                            }
                           }}
-                          onBlur={handleAddCustomFilter}
                           placeholder="New bookmark"
+                          title="Enter to add · click outside to cancel"
                           maxLength={24}
                           autoFocus
                         />
@@ -736,7 +1012,11 @@ export default function Dashboard({ user, onLogout }) {
                     ) : (
                       <button
                         className="filter-chip filter-chip-add"
-                        onClick={() => setShowAddFilterInput(true)}
+                        onClick={() => {
+                          setEditingBookmark(null)
+                          setEditBookmarkValue('')
+                          setShowAddFilterInput(true)
+                        }}
                         aria-label="Add bookmark"
                       >
                         +
@@ -777,6 +1057,43 @@ export default function Dashboard({ user, onLogout }) {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {bookmarkSnack && (
+        <div className="bookmark-snackbar" role="status" aria-live="polite">
+          <div className="bookmark-snackbar-main">
+            <button
+              type="button"
+              className="bookmark-snackbar-dismiss"
+              onClick={() => setBookmarkSnack(null)}
+              aria-label="Dismiss"
+            >
+              <svg
+                className="bookmark-snackbar-dismiss-icon"
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                aria-hidden
+              >
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+            <span className="bookmark-snackbar-text">
+              {bookmarkSnackLabel(bookmarkSnack.restoreMealType, bookmarkSnack.newMealType)}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="bookmark-snackbar-undo"
+            onClick={handleUndoBookmark}
+          >
+            Undo
+          </button>
         </div>
       )}
 

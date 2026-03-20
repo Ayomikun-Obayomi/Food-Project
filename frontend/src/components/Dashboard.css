@@ -376,19 +376,59 @@
   line-height: 1;
 }
 
+/* Rename row: same pill + input pattern as “new bookmark”, with Done */
+.filter-chip-rename-inline {
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 4px 4px;
+  background: var(--bg-elevated, #f0f0f0);
+  border-radius: 100px;
+  border: 1px solid var(--border);
+}
+
+.filter-chip-rename-inline input {
+  width: min(140px, 38vw);
+  max-width: 200px;
+}
+
+.filter-chip-done-btn {
+  padding: 7px 14px;
+  background: var(--accent);
+  border: none;
+  border-radius: 100px;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.filter-chip-done-btn:hover {
+  background: var(--accent-hover);
+}
+
 .filter-chip-x {
   font-size: 18px;
   font-weight: 400;
 }
 
 .filter-chip-add {
-  padding: 7px 14px;
+  /* Perfect circle with + optically centered */
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  border-radius: 50%;
   color: var(--accent);
-  font-size: 22px;
+  font-size: 20px;
+  font-weight: 400;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
+  /* + glyphs often sit low in the font box */
+  padding-bottom: 2px;
 }
 
 .filter-chip-add:hover {
@@ -1173,12 +1213,120 @@
   }
 
   .filter-drawer-chips .filter-chip-add {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
     min-height: 44px;
-    padding: 10px 20px;
-    font-size: 20px;
+    padding: 0;
+    padding-bottom: 2px;
+    border-radius: 50%;
+    font-size: 22px;
   }
 
   .filter-drawer-chips .filter-chip.sub {
     min-height: 44px;
   }
 }
+
+/* Bookmark change confirmation (snackbar) */
+.bookmark-snackbar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 300;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  min-height: 52px;
+  width: min(800px, calc(100vw - 32px));
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  animation: bookmark-snackbar-in 0.25s ease;
+}
+
+@keyframes bookmark-snackbar-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* × + label grouped so vertical center matches the message */
+.bookmark-snackbar-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.bookmark-snackbar-dismiss {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bookmark-snackbar-dismiss:hover {
+  color: var(--text);
+  background: var(--bg-input);
+}
+
+/* SVG icon — geometric center, no font baseline drift vs × character */
+.bookmark-snackbar-dismiss-icon {
+  display: block;
+  flex-shrink: 0;
+}
+
+.bookmark-snackbar-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--text);
+  /* Match dismiss button height so caps sit on same vertical center as the SVG */
+  line-height: 36px;
+  text-align: left;
+}
+
+.bookmark-snackbar-undo {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 16px;
+  margin: 0;
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.bookmark-snackbar-undo:hover {
+  background: rgba(232, 118, 78, 0.2);
+}
+

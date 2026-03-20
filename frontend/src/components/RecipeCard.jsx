@@ -2,31 +2,65 @@ import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import './RecipeCard.css'
 
-export default function RecipeCard({ recipe, onClick, onToggle, bookmarkCategories = [], onUpdateMealType, onAddBookmark }) {
+export default function RecipeCard({
+  recipe,
+  onClick,
+  onToggle,
+  bookmarkCategories = [],
+  onUpdateMealType,
+  onAddBookmark,
+  isBookmarkEditable,
+  onRenameBookmark,
+}) {
   const [showMenu, setShowMenu] = useState(false)
   const [showNewBookmarkInput, setShowNewBookmarkInput] = useState(false)
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 })
   const [newBookmarkValue, setNewBookmarkValue] = useState('')
+  const [editingMenuBookmark, setEditingMenuBookmark] = useState(null)
+  const [editMenuBookmarkValue, setEditMenuBookmarkValue] = useState('')
   const menuRef = useRef(null)
   const btnRef = useRef(null)
   const newBookmarkInputRef = useRef(null)
+  const editMenuBookmarkInputRef = useRef(null)
+  const menuBookmarkClickTimerRef = useRef(null)
 
   useEffect(() => {
     function handleClickOutside(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target) && !btnRef.current?.contains(e.target)) {
-        setShowMenu(false)
-        setShowNewBookmarkInput(false)
-      }
+      const t = e.target
+      if (!(t instanceof Node)) return
+      if (menuRef.current?.contains(t) || btnRef.current?.contains(t)) return
+      setShowMenu(false)
+      setShowNewBookmarkInput(false)
     }
     if (showMenu) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
+      /* Capture phase so this runs before other handlers; closes on any outside click */
+      document.addEventListener('mousedown', handleClickOutside, true)
+      return () => document.removeEventListener('mousedown', handleClickOutside, true)
     }
   }, [showMenu])
 
   useEffect(() => {
     if (showNewBookmarkInput) newBookmarkInputRef.current?.focus()
   }, [showNewBookmarkInput])
+
+  useEffect(() => {
+    if (editingMenuBookmark) editMenuBookmarkInputRef.current?.focus()
+  }, [editingMenuBookmark])
+
+  useEffect(() => {
+    if (!showMenu) {
+      if (menuBookmarkClickTimerRef.current) {
+        clearTimeout(menuBookmarkClickTimerRef.current)
+        menuBookmarkClickTimerRef.current = null
+      }
+      setEditingMenuBookmark(null)
+      setEditMenuBookmarkValue('')
+    }
+  }, [showMenu])
+
+  useEffect(() => () => {
+    if (menuBookmarkClickTimerRef.current) clearTimeout(menuBookmarkClickTimerRef.current)
+  }, [])
 
   function handleLike(e) {
     e.stopPropagation()
@@ -37,24 +71,54 @@ export default function RecipeCard({ recipe, onClick, onToggle, bookmarkCategori
     e.stopPropagation()
     if (!showMenu && btnRef.current) {
       const rect = btnRef.current.getBoundingClientRect()
-      setMenuPos({ top: rect.bottom + 6, left: rect.right - 150 })
+      /* Right edge of menu lines up with bookmark button (CSS translateX(-100%) on portal) */
+      setMenuPos({ top: rect.bottom + 8, left: rect.right })
     }
     setShowMenu(prev => !prev)
   }
 
-  function handleSetBookmark(e, mealType) {
-    e.stopPropagation()
+  function applyBookmarkMealType(mealType) {
     const isCurrentlyIn = (recipe.meal_type || '').toLowerCase() === (mealType || '').toLowerCase()
-    onUpdateMealType?.(recipe.id, isCurrentlyIn ? null : mealType)
+    onUpdateMealType?.(recipe.id, isCurrentlyIn ? null : mealType, recipe.meal_type)
     setShowMenu(false)
   }
 
+  function handleSetBookmark(e, mealType) {
+    e.stopPropagation()
+    applyBookmarkMealType(mealType)
+  }
+
+  /** Single-click assigns bookmark; double-click (custom) opens rename — same pattern as “new bookmark”. */
+  function handleBookmarkRowClick(cat, editable, e) {
+    e.stopPropagation()
+    if (!editable) {
+      applyBookmarkMealType(cat)
+      return
+    }
+    if (e.detail === 2) {
+      if (menuBookmarkClickTimerRef.current) {
+        clearTimeout(menuBookmarkClickTimerRef.current)
+        menuBookmarkClickTimerRef.current = null
+      }
+      setEditingMenuBookmark(cat)
+      setEditMenuBookmarkValue(cat)
+      return
+    }
+    if (e.detail === 1) {
+      menuBookmarkClickTimerRef.current = setTimeout(() => {
+        menuBookmarkClickTimerRef.current = null
+        applyBookmarkMealType(cat)
+      }, 280)
+    }
+  }
+
   function handleAddNewBookmark(e) {
+    e?.preventDefault()
     e?.stopPropagation()
     const name = newBookmarkValue.trim()
     if (name) {
       onAddBookmark?.(name)
-      onUpdateMealType?.(recipe.id, name)
+      onUpdateMealType?.(recipe.id, name, recipe.meal_type)
       setNewBookmarkValue('')
       setShowNewBookmarkInput(false)
       setShowMenu(false)
@@ -64,6 +128,19 @@ export default function RecipeCard({ recipe, onClick, onToggle, bookmarkCategori
   function handleOpenNewBookmarkInput(e) {
     e?.stopPropagation()
     setShowNewBookmarkInput(true)
+  }
+
+  async function handleSaveMenuBookmarkRename(e) {
+    e?.preventDefault()
+    e?.stopPropagation()
+    const oldName = editingMenuBookmark
+    if (!oldName || !onRenameBookmark) return
+    const ok = await onRenameBookmark(oldName, editMenuBookmarkValue.trim())
+    if (ok !== false) {
+      setEditingMenuBookmark(null)
+      setEditMenuBookmarkValue('')
+      setShowMenu(false)
+    }
   }
 
   return (
@@ -85,11 +162,11 @@ export default function RecipeCard({ recipe, onClick, onToggle, bookmarkCategori
                 aria-label="Bookmark"
               >
                 {recipe.meal_type ? (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                     <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" />
                   </svg>
                 ) : (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                     <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" />
                   </svg>
                 )}
@@ -103,16 +180,58 @@ export default function RecipeCard({ recipe, onClick, onToggle, bookmarkCategori
                   <div className="card-menu-label">Bookmark</div>
                   {bookmarkCategories.map(cat => {
                     const isActive = (recipe.meal_type || '').toLowerCase() === cat.toLowerCase()
+                    const editable = typeof isBookmarkEditable === 'function' && isBookmarkEditable(cat)
+                    if (editingMenuBookmark === cat) {
+                      return (
+                        <div
+                          key={cat}
+                          className="card-menu-add-wrap"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <input
+                            ref={editMenuBookmarkInputRef}
+                            type="text"
+                            value={editMenuBookmarkValue}
+                            onChange={e => setEditMenuBookmarkValue(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                void handleSaveMenuBookmarkRename(e)
+                              }
+                              if (e.key === 'Escape') {
+                                e.preventDefault()
+                                setEditingMenuBookmark(null)
+                                setEditMenuBookmarkValue('')
+                              }
+                            }}
+                            maxLength={24}
+                            placeholder="Bookmark name"
+                            className="card-menu-add-input"
+                            aria-label="Rename bookmark"
+                          />
+                          <button
+                            type="button"
+                            className="card-menu-add-btn"
+                            onClick={handleSaveMenuBookmarkRename}
+                          >
+                            Done
+                          </button>
+                        </div>
+                      )
+                    }
                     return (
                       <button
                         key={cat}
+                        type="button"
                         className={`card-menu-item ${isActive ? 'active' : ''}`}
-                        onClick={e => handleSetBookmark(e, cat)}
+                        onClick={e => handleBookmarkRowClick(cat, editable, e)}
+                        title={editable ? 'Double-click to rename' : undefined}
                       >
                         <span className="card-menu-item-label">{cat}</span>
                         {isActive && (
                           <span className="card-menu-item-check" aria-hidden>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                               <polyline points="20 6 9 17 4 12" />
                             </svg>
                           </span>
@@ -128,8 +247,16 @@ export default function RecipeCard({ recipe, onClick, onToggle, bookmarkCategori
                         value={newBookmarkValue}
                         onChange={e => setNewBookmarkValue(e.target.value)}
                         onKeyDown={e => {
-                          if (e.key === 'Enter') handleAddNewBookmark(e)
-                          if (e.key === 'Escape') { setNewBookmarkValue(''); setShowNewBookmarkInput(false) }
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleAddNewBookmark(e)
+                          }
+                          if (e.key === 'Escape') {
+                            e.preventDefault()
+                            setNewBookmarkValue('')
+                            setShowNewBookmarkInput(false)
+                          }
                         }}
                         placeholder="New bookmark..."
                         maxLength={24}
@@ -167,11 +294,20 @@ export default function RecipeCard({ recipe, onClick, onToggle, bookmarkCategori
             </div>
           )}
           <button
-            className={`card-action-btn ${recipe.is_liked ? 'active-like' : ''}`}
+            className={`card-action-btn card-like-btn ${recipe.is_liked ? 'active-like' : ''}`}
             onClick={handleLike}
             title={recipe.is_liked ? 'Unlike' : 'Like'}
+            aria-label={recipe.is_liked ? 'Unlike' : 'Like'}
           >
-            {recipe.is_liked ? '❤️' : '🤍'}
+            {recipe.is_liked ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                <path d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+              </svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+              </svg>
+            )}
           </button>
         </div>
         {recipe.cook_time_minutes && (

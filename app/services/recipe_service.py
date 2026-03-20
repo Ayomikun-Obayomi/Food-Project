@@ -81,3 +81,16 @@ async def update_recipe_flags(
     )
     await db.commit()
     return await get_recipe(db, recipe_id, user_id)
+
+
+async def update_recipe_meal_type(
+    db: AsyncSession, recipe_id: str, user_id: str, meal_type: Optional[str] = None
+) -> Optional[Recipe]:
+    """Update a recipe's meal_type (category). Pass None to remove from category."""
+    await db.execute(
+        update(Recipe)
+        .where(Recipe.id == recipe_id, Recipe.user_id == user_id)
+        .values(meal_type=meal_type)
+    )
+    await db.commit()
+    return await get_recipe(db, recipe_id, user_id)

@@ -22,12 +22,6 @@ export default function RecipeDetail({ recipe, onClose, onDelete, onToggle }) {
               >
                 {recipe.is_liked ? '❤️ Liked' : '🤍 Like'}
               </button>
-              <button
-                className={`detail-btn ${recipe.is_saved ? 'saved' : ''}`}
-                onClick={() => onToggle(recipe.id, { is_saved: !recipe.is_saved })}
-              >
-                {recipe.is_saved ? '🔖 Saved' : '📑 Save'}
-              </button>
             </div>
           </div>
 

@@ -84,6 +84,13 @@ export async function toggleFlags(id, flags) {
   return request(`/recipes/${id}/flags?${query}`, { method: 'PATCH' });
 }
 
+export async function updateRecipeMealType(id, mealType) {
+  return request(`/recipes/${id}/meal-type`, {
+    method: 'PATCH',
+    body: JSON.stringify({ meal_type: mealType }),
+  });
+}
+
 export async function searchRecipes(query, filters = {}) {
   return request('/search', {
     method: 'POST',

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { getRecipes, getRecipe, searchRecipes, deleteRecipe, toggleFlags, imageSearch } from '../api'
+import { getRecipes, getRecipe, searchRecipes, deleteRecipe, toggleFlags, updateRecipeMealType, imageSearch } from '../api'
 import SearchBar from './SearchBar'
 import RecipeCard from './RecipeCard'
 import RecipeDetail from './RecipeDetail'
@@ -173,6 +173,23 @@ export default function Dashboard({ user, onLogout }) {
     }
   }
 
+  async function handleUpdateMealType(id, mealType) {
+    try {
+      const updated = await updateRecipeMealType(id, mealType)
+      const update = list => list.map(r => String(r.id) === String(id) ? updated : r)
+      setRecipes(update)
+      if (searchResults) {
+        setSearchResults(prev => ({ ...prev, recipes: update(prev.recipes) }))
+      }
+      if (selectedRecipe?.id === id) setSelectedRecipe(updated)
+      if (mealType && activeFilter) {
+        setActiveFilter(mealType)
+      }
+    } catch (err) {
+      console.error('Update meal type failed:', err)
+    }
+  }
+
   async function handleSelectSuggestedRecipe(suggestedRecipe) {
     try {
       const full = await getRecipe(suggestedRecipe.id)
@@ -195,32 +212,39 @@ export default function Dashboard({ user, onLogout }) {
     }
   }
 
-  const savedCount = recipes.filter(r => r.is_saved).length
   const likedCount = recipes.filter(r => r.is_liked).length
 
-  const baseMealCategories = ['Breakfast', 'Lunch', 'Snack', 'Dinner']
-  const mealCategories = useMemo(
-    () => [...baseMealCategories, ...customFilters],
-    [customFilters]
-  )
+  const baseBookmarkCategories = ['Breakfast', 'Lunch', 'Snack', 'Dinner']
+  const bookmarkCategories = useMemo(() => {
+    const baseLower = baseBookmarkCategories.map(b => b.toLowerCase())
+    const customOnly = customFilters.filter(c => !baseLower.includes(c.toLowerCase()))
+    return [...baseBookmarkCategories, ...customOnly]
+  }, [customFilters])
 
-  function handleAddCustomFilter() {
-    const name = addFilterValue.trim()
-    if (name && name.length <= 24) {
-      const normalized = name.toLowerCase()
-      const exists = [...baseMealCategories, ...customFilters].some(
-        m => m.toLowerCase() === normalized
-      )
-      if (!exists) setCustomFilters(prev => [...prev, name])
+  function handleAddBookmark(name) {
+    const trimmed = (typeof name === 'string' ? name : addFilterValue).trim()
+    if (trimmed && trimmed.length <= 24) {
+      const normalized = trimmed.toLowerCase()
+      const exists = [...baseBookmarkCategories, ...customFilters].some(m => m.toLowerCase() === normalized)
+      if (!exists) setCustomFilters(prev => [...prev, trimmed])
     }
     setAddFilterValue('')
     setShowAddFilterInput(false)
   }
 
-  function handleRemoveCustomFilter(name, e) {
-    e.stopPropagation()
+  function handleAddCustomFilter() {
+    handleAddBookmark(addFilterValue)
+  }
+
+  function handleRemoveBookmark(name, e) {
+    e?.stopPropagation()
+    if (baseBookmarkCategories.includes(name)) return
     setCustomFilters(prev => prev.filter(f => f !== name))
     if (activeFilter === name) setActiveFilter(null)
+  }
+
+  function isCustomBookmark(name) {
+    return customFilters.includes(name)
   }
 
   const baseRecipes = view === 'liked' ? recipes.filter(r => r.is_liked) : recipes
@@ -314,7 +338,7 @@ export default function Dashboard({ user, onLogout }) {
       el.removeEventListener('scroll', check)
       window.removeEventListener('resize', check)
     }
-  }, [activeFilter, subFilter, mealCategories, subFilterSections, showAddFilterInput])
+  }, [activeFilter, subFilter, bookmarkCategories, subFilterSections, showAddFilterInput])
 
   let displayRecipes = searchResults ? searchResults.recipes : mealRecipes
   if (!searchResults && subFilter) {
@@ -397,19 +421,19 @@ export default function Dashboard({ user, onLogout }) {
                     <div className="filter-chips-row">
                     <div className="filter-chips filter-chips-desktop" ref={filterChipsRef}>
                     <>
-                      {mealCategories.map(meal => (
+                      {bookmarkCategories.map(meal => (
                         <button
                           key={meal}
                           className={`filter-chip ${activeFilter === meal ? 'active' : ''}`}
                           onClick={() => { setActiveFilter(activeFilter === meal ? null : meal); setShowRefineModal(false) }}
                         >
                           <span className="filter-chip-label">{meal}</span>
-                          {customFilters.includes(meal) && (
+                          {isCustomBookmark(meal) && (
                             <span
                               className="filter-chip-x"
-                              onClick={e => handleRemoveCustomFilter(meal, e)}
+                              onClick={e => handleRemoveBookmark(meal, e)}
                               role="button"
-                              aria-label={`Remove ${meal} category`}
+                              aria-label={`Remove ${meal} bookmark`}
                             >
                               &times;
                             </span>
@@ -428,7 +452,7 @@ export default function Dashboard({ user, onLogout }) {
                               if (e.key === 'Escape') { setShowAddFilterInput(false); setAddFilterValue('') }
                             }}
                             onBlur={handleAddCustomFilter}
-                            placeholder="New category"
+                            placeholder="New bookmark"
                             maxLength={24}
                             autoFocus
                           />
@@ -437,7 +461,7 @@ export default function Dashboard({ user, onLogout }) {
                         <button
                           className="filter-chip filter-chip-add"
                           onClick={() => setShowAddFilterInput(true)}
-                          aria-label="Add custom category"
+                          aria-label="Add bookmark"
                         >
                           +
                         </button>
@@ -551,6 +575,9 @@ export default function Dashboard({ user, onLogout }) {
                 recipe={recipe}
                 onClick={() => setSelectedRecipe(recipe)}
                 onToggle={handleToggle}
+                bookmarkCategories={bookmarkCategories}
+                onUpdateMealType={handleUpdateMealType}
+                onAddBookmark={handleAddBookmark}
               />
             ))}
           </div>
@@ -668,21 +695,21 @@ export default function Dashboard({ user, onLogout }) {
             <div className="filter-drawer-body">
               <div className="filter-drawer-scroll">
                 <div className="filter-drawer-section filter-drawer-meal-type">
-                  <label className="filter-drawer-label">Meal type</label>
+                  <label className="filter-drawer-label">Bookmark</label>
                   <div className="filter-drawer-chips">
-                    {mealCategories.map(meal => (
+                    {bookmarkCategories.map(meal => (
                       <button
                         key={meal}
                         className={`filter-chip ${activeFilter === meal ? 'active' : ''}`}
                         onClick={() => setActiveFilter(activeFilter === meal ? null : meal)}
                       >
                         <span className="filter-chip-label">{meal}</span>
-                        {customFilters.includes(meal) && (
+                        {isCustomBookmark(meal) && (
                           <span
                             className="filter-chip-delete"
-                            onClick={e => handleRemoveCustomFilter(meal, e)}
+                            onClick={e => handleRemoveBookmark(meal, e)}
                             role="button"
-                            aria-label={`Remove ${meal} category`}
+                            aria-label={`Remove ${meal} bookmark`}
                           >
                             &times;
                           </span>
@@ -701,7 +728,7 @@ export default function Dashboard({ user, onLogout }) {
                             if (e.key === 'Escape') { setShowAddFilterInput(false); setAddFilterValue('') }
                           }}
                           onBlur={handleAddCustomFilter}
-                          placeholder="New category"
+                          placeholder="New bookmark"
                           maxLength={24}
                           autoFocus
                         />
@@ -710,7 +737,7 @@ export default function Dashboard({ user, onLogout }) {
                       <button
                         className="filter-chip filter-chip-add"
                         onClick={() => setShowAddFilterInput(true)}
-                        aria-label="Add custom category"
+                        aria-label="Add bookmark"
                       >
                         +
                       </button>

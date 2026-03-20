@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from uuid import UUID
 
 from app.core.database import get_db
 from app.models.models import User
-from app.models.schemas import RecipeCreate, RecipeOut
+from app.models.schemas import RecipeCreate, RecipeOut, MealTypeUpdate
 from app.services.auth_service import get_current_user
 from app.services import recipe_service
 
@@ -62,6 +62,22 @@ async def update_flags(
     """Toggle saved/liked status on a recipe."""
     recipe = await recipe_service.update_recipe_flags(
         db, str(recipe_id), str(current_user.id), is_saved, is_liked
+    )
+    if not recipe:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    return recipe
+
+
+@router.patch("/{recipe_id}/meal-type", response_model=RecipeOut)
+async def update_meal_type(
+    recipe_id: UUID,
+    body: MealTypeUpdate = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Save recipe to a category (meal_type) or remove from category."""
+    recipe = await recipe_service.update_recipe_meal_type(
+        db, str(recipe_id), str(current_user.id), body.meal_type
     )
     if not recipe:
         raise HTTPException(status_code=404, detail="Recipe not found")

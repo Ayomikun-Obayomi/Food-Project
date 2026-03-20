@@ -81,26 +81,14 @@ export default function AddRecipe({ onClose, onAdded }) {
               />
             </div>
 
-            <div className="form-row two-col">
-              <div className="input-group">
-                <label>Cuisine</label>
-                <input
-                  type="text"
-                  value={form.cuisine}
-                  onChange={e => update('cuisine', e.target.value)}
-                  placeholder="Italian"
-                />
-              </div>
-              <div className="input-group">
-                <label>Meal Type</label>
-                <select value={form.meal_type} onChange={e => update('meal_type', e.target.value)}>
-                  <option value="">Select...</option>
-                  <option value="breakfast">Breakfast</option>
-                  <option value="lunch">Lunch</option>
-                  <option value="dinner">Dinner</option>
-                  <option value="snack">Snack</option>
-                </select>
-              </div>
+            <div className="input-group">
+              <label>Cuisine</label>
+              <input
+                type="text"
+                value={form.cuisine}
+                onChange={e => update('cuisine', e.target.value)}
+                placeholder="Italian"
+              />
             </div>
 
             <div className="form-row two-col">

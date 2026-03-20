@@ -19,9 +19,12 @@ services:
 
   api:
     build: .
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # No --reload: macOS + Docker bind mounts + file watchers -> OSError [Errno 35].
+    # --loop asyncio: avoids uvloop edge cases on Docker Desktop for Mac.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --loop asyncio
     volumes:
-      - .:/app
+      # :cached reduces macOS virtiofs / osxfs deadlock-style errors on heavy I/O
+      - .:/app:cached
     ports:
       - "8000:8000"
     environment:
@@ -36,7 +39,7 @@ services:
     build: .
     command: celery -A app.workers.sync_worker worker --loglevel=info -Q social_sync,embeddings
     volumes:
-      - .:/app
+      - .:/app:cached
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:password@db:5432/recipes_db
       REDIS_URL: redis://redis:6379/0

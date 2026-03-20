@@ -52,6 +52,10 @@ class RecipeCreate(BaseModel):
     is_liked: bool = False
 
 
+class MealTypeUpdate(BaseModel):
+    meal_type: Optional[str] = None
+
+
 class RecipeOut(BaseModel):
     id: UUID4
     title: str
